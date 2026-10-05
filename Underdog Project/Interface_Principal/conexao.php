@@ -6,8 +6,8 @@ ini_set('display_errors', 1);
 
 $dbHost = '127.0.0.1';
 $dbName = 'hi_teach';
-$dbUser = 'hi_teach_app';
-$dbPass = 'admin_pucpr';
+$dbUser = 'root';
+$dbPass = '';
 
 try {
     $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [

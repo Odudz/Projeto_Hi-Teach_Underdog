@@ -475,17 +475,48 @@
 			loadFile(event.dataTransfer.files[0]);
 		});
 
+		const dataUrlToBlob = (dataUrl) => {
+			const [header, data] = dataUrl.split(",");
+			const mime = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+			const bytes = atob(data);
+			const buffer = new Uint8Array(bytes.length);
+			for (let i = 0; i < bytes.length; i++) buffer[i] = bytes.charCodeAt(i);
+			return new Blob([buffer], { type: mime });
+		};
+
 		const exportBlob = () =>
-			new Promise((resolve) => {
+			new Promise((resolve, reject) => {
 				const output = document.createElement("canvas");
 				output.width = outWidth;
 				output.height = outHeight;
 				const outputCtx = output.getContext("2d");
+				if (!outputCtx) {
+					reject(new Error("Não foi possível preparar o editor de imagem."));
+					return;
+				}
 				outputCtx.fillStyle = "#fff";
 				outputCtx.fillRect(0, 0, outWidth, outHeight);
 				paintImage(outputCtx, outWidth / 2, outHeight / 2, outWidth / frame.w);
 				if (!hasCtxFilter) adjustPixels(outputCtx, outWidth, outHeight);
-				output.toBlob(resolve, "image/jpeg", 0.9);
+				if (output.toBlob) {
+					output.toBlob((blob) => {
+						if (blob) {
+							resolve(blob);
+							return;
+						}
+						try {
+							resolve(dataUrlToBlob(output.toDataURL("image/jpeg", 0.9)));
+						} catch {
+							reject(new Error("Não foi possível preparar a imagem."));
+						}
+					}, "image/jpeg", 0.9);
+					return;
+				}
+				try {
+					resolve(dataUrlToBlob(output.toDataURL("image/jpeg", 0.9)));
+				} catch {
+					reject(new Error("Não foi possível preparar a imagem."));
+				}
 			});
 
 		const setSaving = (value) => {
@@ -505,12 +536,19 @@
 				const body = new FormData();
 				body.append("action", kind);
 				body.append("image", blob, `${kind}.jpg`);
-				const response = await fetch(overlay.dataset.endpoint, {
+				const endpoint = new URL(overlay.dataset.endpoint, window.location.href);
+				const response = await fetch(endpoint.toString(), {
 					method: "POST",
 					headers: { "X-Requested-With": "fetch" },
 					body,
 				});
-				const data = await response.json().catch(() => null);
+				const text = await response.text();
+				let data = null;
+				try {
+					data = text ? JSON.parse(text) : null;
+				} catch {
+					throw new Error("O servidor não conseguiu concluir o salvamento da imagem.");
+				}
 				if (!response.ok || !data?.ok) {
 					throw new Error(
 						data?.error || "Não foi possível salvar. Entre na sua conta e tente de novo.",

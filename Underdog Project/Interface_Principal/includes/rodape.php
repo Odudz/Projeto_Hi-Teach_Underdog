@@ -57,11 +57,12 @@
   </section>
 </div>
 
-<script src="js/modal.js"></script>
-<script src="js/settings.js"></script>
+<?php $baseUrl = $baseUrl ?? ''; ?>
+<script src="<?= e($baseUrl) ?>js/modal.js"></script>
+<script src="<?= e($baseUrl) ?>js/settings.js"></script>
 <?php foreach ($extraJs ?? [] as $script): ?>
-<script src="js/<?= e($script) ?>.js"></script>
+<script src="<?= e($baseUrl) ?>js/<?= e($script) ?>.js"></script>
 <?php endforeach; ?>
-<script src="js/main.js"></script>
+<script src="<?= e($baseUrl) ?>js/main.js"></script>
 </body>
 </html>

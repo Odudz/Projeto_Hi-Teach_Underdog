@@ -1,8 +1,9 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 $pageId = 'messages';
 $pageTitle = 'Mensagens';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="contact-list-section" class="section">
@@ -25,4 +26,4 @@ include_once 'cabecalho.php';
     </form>
   </section>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

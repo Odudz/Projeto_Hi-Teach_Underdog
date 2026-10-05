@@ -3,23 +3,24 @@ $pageId = $pageId ?? 'page';
 $pageTitle = $pageTitle ?? 'Hi Teach';
 $extraCss = $extraCss ?? [];
 $openModal = $openModal ?? '';
+$baseUrl = $baseUrl ?? '';
 $currentFile = basename($_SERVER['SCRIPT_NAME']);
 
 $navItems = [
     ['index.php', 'Início'],
-    ['subjects.php', 'Matérias'],
-    ['live-class.php', 'Aulas ao vivo'],
-    ['forum.php', 'Fóruns'],
-    ['messages.php', 'Mensagens'],
+    ['pages/subjects.php', 'Matérias'],
+    ['pages/live-class.php', 'Aulas ao vivo'],
+    ['pages/forum.php', 'Fóruns'],
+    ['pages/messages.php', 'Mensagens'],
 ];
 if ($user && $user['role'] === 'teacher') {
-    $navItems[] = ['teacher-dashboard.php', 'Painel do professor'];
+    $navItems[] = ['pages/teacher-dashboard.php', 'Painel do professor'];
 }
 if ($user && $user['role'] === 'admin') {
-    $navItems[] = ['moderator-dashboard.php', 'Administração'];
+    $navItems[] = ['pages/moderator-dashboard.php', 'Administração'];
 }
 if (!$user) {
-    $navItems[] = ['login.php', 'Entrar'];
+    $navItems[] = ['auth/login.php', 'Entrar'];
 }
 
 $headerInitials = '';
@@ -34,33 +35,33 @@ if ($user) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($pageTitle) ?> | Hi Teach</title>
-<link rel="stylesheet" href="css/base.css">
-<link rel="stylesheet" href="css/themes.css">
-<link rel="stylesheet" href="css/layout.css">
-<link rel="stylesheet" href="css/components.css">
-<link rel="stylesheet" href="css/modal.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/base.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/themes.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/layout.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/components.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/modal.css">
 <?php foreach ($extraCss as $sheet): ?>
-<link rel="stylesheet" href="css/<?= e($sheet) ?>.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/<?= e($sheet) ?>.css">
 <?php endforeach; ?>
-<link rel="stylesheet" href="css/settings.css">
-<link rel="stylesheet" href="css/animations.css">
-<script src="js/theme.js"></script>
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/settings.css">
+<link rel="stylesheet" href="<?= e($baseUrl) ?>css/animations.css">
+<script src="<?= e($baseUrl) ?>js/theme.js"></script>
 </head>
 <body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"<?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
 <header id="site-header" class="site-header">
-  <a id="site-logo" class="site-logo" href="index.php">Hi Teach</a>
+  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">Hi Teach</a>
   <nav id="main-nav" class="main-nav">
     <ul class="nav-list">
       <?php foreach ($navItems as $index => [$href, $label]): ?>
-        <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link" id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($href) ?>"<?= $currentFile === $href ? ' aria-current="page"' : '' ?>><?= e($label) ?></a></li>
+        <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link" id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($baseUrl . $href) ?>"<?= $currentFile === basename($href) ? ' aria-current="page"' : '' ?>><?= e($label) ?></a></li>
       <?php endforeach; ?>
     </ul>
   </nav>
   <div id="header-actions" class="header-actions">
     <?php if ($user): ?>
-      <a id="header-avatar" class="header-avatar" href="profile.php" aria-label="Meu perfil" title="Meu perfil"<?= $currentFile === 'profile.php' ? ' aria-current="page"' : '' ?>>
+      <a id="header-avatar" class="header-avatar" href="<?= e($baseUrl) ?>pages/profile.php" aria-label="Meu perfil" title="Meu perfil"<?= $currentFile === 'profile.php' ? ' aria-current="page"' : '' ?>>
         <?php if ($user['avatar_mime']): ?>
-          <img class="header-avatar-image" src="image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
+          <img class="header-avatar-image" src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
         <?php else: ?>
           <span class="header-avatar-initials"><?= e($headerInitials) ?></span>
         <?php endif; ?>

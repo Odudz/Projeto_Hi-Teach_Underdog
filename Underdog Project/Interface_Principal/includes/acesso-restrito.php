@@ -1,13 +1,16 @@
 <?php
 $pageId = 'gate';
+$baseUrl = $baseUrl ?? '';
+$currentFile = basename($_SERVER['SCRIPT_NAME']);
+$nextTarget = in_array($currentFile, ['index.php', 'activity.php'], true) ? $currentFile : 'pages/' . $currentFile;
 
 if ($gate === 'login') {
     http_response_code(401);
     $pageTitle = 'Ops! Você precisa entrar';
     $text = 'Crie uma conta ou entre na sua para acessar esta página. É rapidinho!';
     $buttons = [
-        ['Entrar', 'login.php?next=' . urlencode(basename($_SERVER['SCRIPT_NAME'])), 'button-primary'],
-        ['Criar conta', 'register.php', 'button-secondary'],
+        ['Entrar', $baseUrl . 'auth/login.php?next=' . urlencode($nextTarget), 'button-primary'],
+        ['Criar conta', $baseUrl . 'auth/register.php', 'button-secondary'],
     ];
 } elseif ($gate === 'teacher') {
     http_response_code(403);
@@ -20,15 +23,15 @@ if ($gate === 'login') {
     $text = $isPending
         ? 'Seu cadastro de professor está em análise. Assim que for aprovado, este painel será liberado.'
         : 'Esta área é exclusiva para professores aprovados.';
-    $buttons = [['Voltar ao perfil', 'profile.php', 'button-primary']];
+    $buttons = [['Voltar ao perfil', $baseUrl . 'pages/profile.php', 'button-primary']];
 } else {
     http_response_code(403);
     $pageTitle = 'Área restrita';
     $text = 'Esta área é exclusiva para administradores.';
-    $buttons = [['Voltar ao perfil', 'profile.php', 'button-primary']];
+    $buttons = [['Voltar ao perfil', $baseUrl . 'pages/profile.php', 'button-primary']];
 }
 
-include_once 'cabecalho.php';
+include_once __DIR__ . '/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="gate" class="gate">
@@ -59,5 +62,5 @@ include_once 'cabecalho.php';
   </section>
 </main>
 <?php
-include_once 'rodape.php';
+include_once __DIR__ . '/rodape.php';
 exit;

@@ -1,5 +1,5 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 
 $type = $_GET['type'] ?? '';
 if (!in_array($type, ['avatar', 'banner'], true)) {

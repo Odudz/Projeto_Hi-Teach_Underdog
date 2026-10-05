@@ -1,9 +1,10 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 
 if (!$user || $user['role'] !== 'admin') {
     $gate = $user ? 'admin' : 'login';
-    include_once 'acesso-restrito.php';
+    $baseUrl = '../';
+    include_once __DIR__ . '/../includes/acesso-restrito.php';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -37,7 +38,8 @@ $pending = $pdo->query(
 
 $pageId = 'moderator-dashboard';
 $pageTitle = 'Painel do moderador';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="pending-teachers" class="section">
@@ -61,7 +63,7 @@ include_once 'cabecalho.php';
             <td class="table-cell"><?= e($teacher['name']) ?></td>
             <td class="table-cell"><?= e($teacher['email']) ?></td>
             <td class="table-cell"><?= e($teacher['specializations']) ?></td>
-            <td class="table-cell"><a class="card-link" href="teacher-proof.php?user=<?= (int) $teacher['user_id'] ?>" target="_blank" rel="noopener noreferrer">Ver comprovante</a></td>
+            <td class="table-cell"><a class="card-link" href="../endpoints/teacher-proof.php?user=<?= (int) $teacher['user_id'] ?>" target="_blank" rel="noopener noreferrer">Ver comprovante</a></td>
             <td class="table-cell">
               <form class="inline-form" action="moderator-dashboard.php" method="post">
                 <input type="hidden" name="user_id" value="<?= (int) $teacher['user_id'] ?>">
@@ -113,4 +115,4 @@ include_once 'cabecalho.php';
     </section>
   <?php endforeach; ?>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

@@ -1,13 +1,21 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 
 if ($user) {
-    redirect('profile.php');
+    redirect('../pages/profile.php');
 }
 
 $next = $_POST['next'] ?? $_GET['next'] ?? '';
-if (!preg_match('/^[a-z-]+\.php$/', $next) || in_array($next, ['login.php', 'register.php'], true) || !is_file(__DIR__ . '/' . $next)) {
+$next = str_replace('\\', '/', $next);
+if (preg_match('/^[a-z-]+\.php$/', $next) && is_file(__DIR__ . '/../pages/' . $next)) {
+    $nextRedirect = '../pages/' . $next;
+} elseif (preg_match('/^pages\/[a-z-]+\.php$/', $next) && is_file(__DIR__ . '/../' . $next)) {
+    $nextRedirect = '../' . $next;
+} elseif (in_array($next, ['index.php', 'activity.php'], true) && is_file(__DIR__ . '/../' . $next)) {
+    $nextRedirect = '../' . $next;
+} else {
     $next = '';
+    $nextRedirect = '';
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -21,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($account && password_verify($password, $account['password_hash'])) {
         $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')->execute([$account['id']]);
         $_SESSION['uid'] = $account['id'];
-        redirect($next !== '' ? $next : 'profile.php');
+        redirect($nextRedirect !== '' ? $nextRedirect : '../pages/profile.php');
     }
 
     setFlash('error', 'E-mail ou senha inválidos.');
@@ -29,7 +37,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageId = 'login';
 $pageTitle = 'Entrar';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="login-section" class="section">
@@ -69,4 +78,4 @@ include_once 'cabecalho.php';
     <p class="form-note">Não tem conta? <a id="link-register" href="register.php">Cadastre-se</a></p>
   </section>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

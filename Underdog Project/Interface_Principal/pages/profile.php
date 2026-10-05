@@ -1,9 +1,10 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 
 if (!$user) {
     $gate = 'login';
-    include_once 'acesso-restrito.php';
+    $baseUrl = '../';
+    include_once __DIR__ . '/../includes/acesso-restrito.php';
 }
 
 const AVATAR_MAX_MB = 5;
@@ -11,7 +12,7 @@ const BANNER_MAX_MB = 5;
 const AVATAR_MAX_PX = 512;
 const BANNER_MAX_PX = 1600;
 const IMAGE_MAX_SOURCE_PX = 6000;
-function processImage(?array $file, int $maxMb, int $maxPx, string &$error): ?string
+function processImage(?array $file, int $maxMb, int $maxPx, string &$error): ?array
 {
     if (!$file || $file['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
@@ -41,6 +42,13 @@ function processImage(?array $file, int $maxMb, int $maxPx, string &$error): ?st
         return null;
     }
 
+    if (!function_exists('imagecreatefromstring') || !function_exists('imagecreatetruecolor') || !function_exists('imagejpeg')) {
+        return [
+            'bytes' => file_get_contents($file['tmp_name']),
+            'mime' => $info['mime'] ?? 'image/jpeg',
+        ];
+    }
+
     $source = @imagecreatefromstring(file_get_contents($file['tmp_name']));
     if (!$source) {
         $error = 'Imagem inválida.';
@@ -65,13 +73,17 @@ function processImage(?array $file, int $maxMb, int $maxPx, string &$error): ?st
 
     ob_start();
     imagejpeg($canvas, null, 85);
-    return ob_get_clean();
+    return [
+        'bytes' => ob_get_clean(),
+        'mime' => 'image/jpeg',
+    ];
 }
-function saveImage(PDO $pdo, int $userId, string $kind, string $bytes): void
+function saveImage(PDO $pdo, int $userId, string $kind, string $bytes, string $mime): void
 {
-    $stmt = $pdo->prepare("UPDATE users SET {$kind}_data = ?, {$kind}_mime = 'image/jpeg' WHERE id = ?");
+    $stmt = $pdo->prepare("UPDATE users SET {$kind}_data = ?, {$kind}_mime = ? WHERE id = ?");
     $stmt->bindValue(1, $bytes, PDO::PARAM_LOB);
-    $stmt->bindValue(2, $userId, PDO::PARAM_INT);
+    $stmt->bindValue(2, $mime);
+    $stmt->bindValue(3, $userId, PDO::PARAM_INT);
     $stmt->execute();
 }
 
@@ -83,13 +95,15 @@ function jsonResponse(int $status, array $data): never
     exit;
 }
 
+$imageKinds = [
+    'avatar' => [AVATAR_MAX_MB, AVATAR_MAX_PX, 'Foto de perfil atualizada!'],
+    'banner' => [BANNER_MAX_MB, BANNER_MAX_PX, 'Banner atualizado!'],
+];
+$kind = $_POST['action'] ?? '';
 $isFetch = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isFetch) {
-    $imageKinds = [
-        'avatar' => [AVATAR_MAX_MB, AVATAR_MAX_PX, 'Foto de perfil atualizada!'],
-        'banner' => [BANNER_MAX_MB, BANNER_MAX_PX, 'Banner atualizado!'],
-    ];
-    $kind = $_POST['action'] ?? '';
+$isImageUpload = $_SERVER['REQUEST_METHOD'] === 'POST' && ($isFetch || isset($imageKinds[$kind]));
+
+if ($isImageUpload) {
 
     if (empty($_POST) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
         jsonResponse(413, ['ok' => false, 'error' => 'A imagem passa do limite do servidor (' . ini_get('post_max_size') . ').']);
@@ -100,16 +114,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isFetch) {
 
     [$maxMb, $maxPx, $successMessage] = $imageKinds[$kind];
     $imageError = '';
-    $bytes = processImage($_FILES['image'] ?? null, $maxMb, $maxPx, $imageError);
-    if ($bytes === null) {
+    $image = processImage($_FILES['image'] ?? null, $maxMb, $maxPx, $imageError);
+    if ($image === null) {
         jsonResponse(422, ['ok' => false, 'error' => $imageError ?: 'Nenhuma imagem enviada.']);
     }
 
-    saveImage($pdo, $user['id'], $kind, $bytes);
+    saveImage($pdo, $user['id'], $kind, $image['bytes'], $image['mime']);
     jsonResponse(200, [
         'ok' => true,
         'message' => $successMessage,
-        'url' => 'image.php?user=' . (int) $user['id'] . '&type=' . $kind . '&v=' . time(),
+        'url' => '../endpoints/image.php?user=' . (int) $user['id'] . '&type=' . $kind . '&v=' . time(),
     ]);
 }
 
@@ -150,6 +164,7 @@ $pageId = 'profile';
 $pageTitle = 'Perfil';
 $extraCss = ['profile', 'image-editor'];
 $extraJs = ['image-editor'];
+$baseUrl = '../';
 
 $roleLabels = ['student' => 'Aluno', 'teacher' => 'Professor', 'admin' => 'Administrador'];
 $roleLabel = $roleLabels[$user['role']] ?? 'Aluno';
@@ -345,7 +360,7 @@ foreach ($imageEditors as $kind => $editor):
 <?php
 endforeach;
 $modals .= ob_get_clean();
-include_once 'cabecalho.php';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="profile-header" class="profile-header">
@@ -354,7 +369,7 @@ include_once 'cabecalho.php';
         <img
           id="profile-banner-image"
           class="profile-banner-image"
-          src="image.php?user=<?= (int) $user['id'] ?>&amp;type=banner"
+          src="../endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=banner"
           alt=""
         >
       <?php endif; ?>
@@ -374,7 +389,7 @@ include_once 'cabecalho.php';
           <img
             id="profile-avatar-image"
             class="profile-avatar-image"
-            src="image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar"
+            src="../endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar"
             alt="Foto de perfil de <?= e($user['name']) ?>"
           >
         <?php else: ?>
@@ -406,7 +421,7 @@ include_once 'cabecalho.php';
         >
           Editar perfil
         </button>
-        <form id="logout-form" action="logout.php" method="post">
+        <form id="logout-form" action="../auth/logout.php" method="post">
           <button type="submit" id="logout-button" class="button button-danger">Sair</button>
         </form>
       </div>
@@ -480,4 +495,4 @@ include_once 'cabecalho.php';
     </section>
   <?php endif; ?>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

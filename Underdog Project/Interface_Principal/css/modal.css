@@ -1,0 +1,103 @@
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0);
+  -webkit-backdrop-filter: blur(0);
+  backdrop-filter: blur(0);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-base) ease,
+    background-color var(--duration-slow) ease,
+    backdrop-filter var(--duration-slow) ease,
+    -webkit-backdrop-filter var(--duration-slow) ease,
+    visibility 0s linear var(--duration-slow);
+}
+.modal-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+  background: rgba(51, 51, 51, 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  transition-delay: 0s;
+}
+.modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(32px) scale(0.92);
+  transition:
+    transform var(--duration-slow) var(--ease-bounce),
+    opacity var(--duration-base) ease;
+}
+.modal-overlay.is-open .modal {
+  opacity: 1;
+  transform: none;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border);
+}
+.modal-title {
+  font-size: var(--font-size-xl);
+}
+.modal-close {
+  width: 36px;
+  height: 36px;
+  background: var(--color-background);
+  color: var(--color-text);
+  border: var(--border);
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transform-origin: center;
+  transition:
+    transform var(--duration-base) var(--ease-bounce),
+    background-color var(--duration-base) ease,
+    box-shadow var(--duration-base) ease;
+}
+.modal-close:hover {
+  background: var(--color-secondary);
+}
+.modal-close:active {
+  transform: translate(2px, 2px) rotate(0) scale(0.95);
+  box-shadow: 1px 1px 0 var(--color-text);
+}
+.modal-close:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 3px;
+}
+.modal .form {
+  max-width: none;
+  padding: var(--space-3) 0 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: var(--space-3);
+  }
+  .modal {
+    padding: var(--space-3);
+  }
+}

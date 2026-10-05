@@ -12,22 +12,19 @@
   --color-header: #232726;
   --color-header-text: #e6e8e3;
   --color-on-primary: #e6e8e3;
-  --color-primary-hover: #4b5553;
-
+  --color-primary-hover: #92aaa5;
   --border-width: 3px;
   --border: var(--border-width) solid var(--color-border);
   --shadow-sm: 2px 2px 0 var(--color-border);
   --shadow-md: 4px 4px 0 var(--color-border);
   --shadow-lg: 8px 8px 0 var(--color-border);
   --radius: 10px;
-
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 16px;
   --space-4: 24px;
   --space-5: 32px;
   --space-6: 48px;
-
   --font-family: "Baloo 2", cursive;
   --font-size-sm: 16px;
   --font-size-base: 18px;
@@ -35,14 +32,12 @@
   --font-size-xl: 28px;
   --font-size-2xl: 36px;
   --font-size-3xl: 52px;
-
   --duration-fast: 150ms;
   --duration-base: 300ms;
   --duration-slow: 500ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
-
   --container-width: 1100px;
 }
 
@@ -105,4 +100,8 @@ ul {
   h2 {
     font-size: var(--font-size-lg);
   }
+}
+
+[hidden] {
+  display: none !important;
 }

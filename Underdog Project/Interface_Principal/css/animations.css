@@ -1,0 +1,131 @@
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  border-right: var(--border);
+}
+body::before {
+  z-index: 1000;
+  background: var(--color-primary);
+  animation: page-enter var(--duration-slow) var(--ease-in-out) 120ms both;
+}
+body::after {
+  z-index: 1001;
+  background: var(--color-header);
+  animation: page-enter var(--duration-slow) var(--ease-in-out) both;
+}
+body.is-leaving::before {
+  animation: page-leave var(--duration-slow) var(--ease-in-out) both;
+}
+body.is-leaving::after {
+  animation: page-leave var(--duration-slow) var(--ease-in-out) 120ms both;
+}
+
+@keyframes page-enter {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(101%);
+  }
+}
+@keyframes page-leave {
+  from {
+    transform: translateX(-101%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.reveal {
+  opacity: 0;
+}
+.reveal.is-visible {
+  animation: reveal-up var(--duration-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    translate: 0 24px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .reveal {
+    opacity: 1;
+  }
+  body::before,
+  body::after {
+    display: none;
+  }
+}
+
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+[data-motion="reduced"] .reveal {
+  opacity: 1;
+}
+[data-motion="reduced"] body::before,
+[data-motion="reduced"] body::after {
+  display: none;
+}
+
+.art-lock {
+  animation: gate-float 3.2s ease-in-out infinite;
+}
+.art-eye {
+  animation: gate-blink 4.5s ease-in-out infinite;
+}
+.art-star-one {
+  animation: gate-twinkle 1.8s ease-in-out infinite alternate;
+}
+.art-star-two {
+  animation: gate-twinkle 2.4s ease-in-out 0.6s infinite alternate;
+}
+@keyframes gate-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+@keyframes gate-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes gate-twinkle {
+  from {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}

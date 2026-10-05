@@ -1,0 +1,241 @@
+html.is-locked {
+  overflow: hidden;
+}
+html.theme-changing
+  *:not(.switch-track):not(.switch-knob):not(.switch-stars):not(
+    .switch-clouds
+  ):not(.modal-overlay) {
+  transition:
+    background-color 500ms ease,
+    color 500ms ease,
+    border-color 500ms ease,
+    box-shadow 500ms ease !important;
+}
+
+.settings-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  color: var(--color-header-text);
+  border: 2px solid var(--color-header-text);
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 500ms var(--ease-bounce),
+    background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+.settings-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 500ms var(--ease-bounce);
+}
+
+.settings-button:hover,
+.settings-button:focus-visible,
+.settings-button[aria-expanded="true"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.settings-button:hover,
+.settings-button:focus-visible {
+  transform: translateY(-2px) scale(1.08);
+}
+.settings-button:focus-visible {
+  outline-color: var(--color-header-text);
+}
+.settings-button:hover .settings-icon,
+.settings-button:focus-visible .settings-icon {
+  transform: rotate(90deg);
+}
+.settings-button[aria-expanded="true"] .settings-icon {
+  transform: rotate(180deg);
+}
+.settings-button:active {
+  transform: scale(0.9);
+}
+
+.settings-group {
+  margin-top: var(--space-4);
+}
+.settings-group-title {
+  margin-bottom: var(--space-1);
+  font-size: var(--font-size-base);
+}
+.settings-note {
+  margin-top: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.theme-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 2px dashed var(--color-surface-strong);
+  cursor: pointer;
+}
+.switch-text {
+  display: flex;
+  flex-direction: column;
+}
+.switch-label {
+  font-weight: 700;
+}
+.switch-hint {
+  font-size: var(--font-size-sm);
+  opacity: 0.75;
+}
+.switch-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+.switch-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 76px;
+  height: 40px;
+  overflow: hidden;
+  background: var(--color-surface-strong);
+  border: var(--border);
+  border-radius: 40px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    background-color var(--duration-slow) ease,
+    transform var(--duration-fast) ease;
+}
+.theme-switch:hover .switch-track {
+  transform: scale(1.04);
+}
+.switch-input:focus-visible + .switch-track {
+  outline: var(--border-width) solid var(--color-primary);
+  outline-offset: 3px;
+}
+.switch-knob {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 26px;
+  height: 26px;
+  background-color: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  transition:
+    transform 650ms cubic-bezier(0.34, 1.2, 0.64, 1),
+    background-color 500ms ease,
+    box-shadow 500ms ease,
+    scale 150ms ease;
+}
+.switch-stars,
+.switch-clouds {
+  position: absolute;
+  opacity: 0;
+  transition:
+    opacity var(--duration-slow) ease,
+    transform 600ms var(--ease-bounce);
+}
+.switch-stars {
+  inset: 0;
+  transform: translateY(-16px);
+  background-image:
+    radial-gradient(circle at 18% 30%, #fff 0 1.5px, transparent 2px),
+    radial-gradient(circle at 38% 68%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 55% 24%, #fff 0 1px, transparent 1.5px),
+    radial-gradient(circle at 28% 52%, #fff 0 1px, transparent 1.5px);
+}
+.switch-clouds {
+  left: 10px;
+  bottom: 6px;
+  width: 16px;
+  height: 7px;
+  background: #fff;
+  border-radius: 7px;
+  box-shadow:
+    12px -5px 0 1px #fff,
+    22px 1px 0 -1px #fff;
+  transform: translateX(28px);
+}
+
+.theme-switch-day .switch-input:checked + .switch-track {
+  background: #bfe3f5;
+}
+.theme-switch-day .switch-input:checked + .switch-track .switch-knob {
+  background-color: #f7c948;
+  transform: translateX(36px) rotate(360deg);
+  box-shadow:
+    0 0 0 4px rgba(247, 201, 72, 0.4),
+    0 0 14px 4px rgba(247, 201, 72, 0.6);
+}
+.theme-switch-day .switch-input:checked + .switch-track .switch-clouds {
+  opacity: 1;
+  transform: none;
+}
+
+.theme-switch-night .switch-input:checked + .switch-track {
+  background: #26364a;
+}
+.theme-switch-amoled .switch-input:checked + .switch-track {
+  background: #000;
+}
+.theme-switch-night .switch-input:checked + .switch-track .switch-knob,
+.theme-switch-amoled .switch-input:checked + .switch-track .switch-knob {
+  background-color: #e6e8e3;
+  transform: translateX(36px) rotate(-360deg);
+  box-shadow: 0 0 12px 2px rgba(230, 232, 227, 0.45);
+}
+.theme-switch-night .switch-input:checked + .switch-track .switch-stars,
+.theme-switch-amoled .switch-input:checked + .switch-track .switch-stars {
+  opacity: 1;
+  transform: none;
+  animation: stars-twinkle 1.8s ease-in-out infinite alternate;
+}
+
+.theme-switch-plain .switch-input:checked + .switch-track {
+  background: var(--color-primary);
+}
+.theme-switch-plain .switch-input:checked + .switch-track .switch-knob {
+  background-color: var(--color-on-primary);
+  transform: translateX(36px);
+}
+
+@keyframes stars-twinkle {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.switch-knob::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.5) rotate(-90deg);
+  background-image:
+    radial-gradient(circle at 32% 35%, #b4babb 0 3px, transparent 3.5px),
+    radial-gradient(circle at 66% 62%, #b4babb 0 4px, transparent 4.5px),
+    radial-gradient(circle at 62% 24%, #b4babb 0 2px, transparent 2.5px);
+  transition:
+    opacity 500ms ease,
+    transform 650ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.theme-switch-night .switch-input:checked + .switch-track .switch-knob::before,
+.theme-switch-amoled
+  .switch-input:checked
+  + .switch-track
+  .switch-knob::before {
+  opacity: 1;
+  transform: none;
+}
+.theme-switch:active .switch-knob {
+  scale: 0.88;
+}

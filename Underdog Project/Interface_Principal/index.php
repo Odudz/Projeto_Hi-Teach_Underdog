@@ -9,8 +9,10 @@ include_once __DIR__ . '/includes/cabecalho.php';
   <section id="hero" class="hero">
     <h1 class="hero-title">Estude a distância com a estrutura da sala de aula</h1>
     <p class="hero-text">Videoaulas, materiais, aulas ao vivo e fóruns por matéria.</p>
-    <a id="cta-register" class="button button-primary" href="auth/register.php">Criar conta</a>
-    <a id="cta-login" class="button button-secondary" href="auth/login.php">Entrar</a>
+    <?php if (!$user): ?>
+        <a id="cta-register" class="button button-primary" href="auth/register.php">Criar conta</a>
+        <a id="cta-login" class="button button-secondary" href="auth/login.php">Entrar</a>
+    <?php endif; ?>
   </section>
 
   <section id="features" class="section features">

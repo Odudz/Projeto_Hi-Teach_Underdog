@@ -1,8 +1,9 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 $pageId = 'classroom';
 $pageTitle = 'Sala virtual';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="classroom-header" class="section">
@@ -21,10 +22,10 @@ include_once 'cabecalho.php';
     <article class="card activity-card">
       <h3 class="card-title">Título da atividade</h3>
       <p class="card-text">Prazo: —</p>
-      <a class="card-link" href="activity.php">Abrir</a>
+      <a class="card-link" href="../activity.php">Abrir</a>
     </article>
 
     <ul id="activity-list" class="activity-list"></ul>
   </section>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

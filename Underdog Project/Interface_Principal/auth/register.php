@@ -1,8 +1,8 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 
 if ($user) {
-    redirect('profile.php');
+    redirect('../pages/profile.php');
 }
 
 const PROOF_MAX_MB = 5;
@@ -84,7 +84,7 @@ function storeProof(?array $file, string &$error): ?string
         return null;
     }
 
-    $folder = __DIR__ . '/storage/private/proofs';
+    $folder = __DIR__ . '/../storage/private/proofs';
     if (!is_dir($folder)) {
         mkdir($folder, 0755, true);
     }
@@ -146,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (PDOException $exception) {
             $pdo->rollBack();
             if ($proofName) {
-                @unlink(__DIR__ . '/storage/private/proofs/' . $proofName);
+                @unlink(__DIR__ . '/../storage/private/proofs/' . $proofName);
             }
             if ($exception->getCode() !== '23000') {
                 throw $exception;
@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('success', $data['role'] === 'teacher'
             ? 'Conta criada! Seu perfil de professor será liberado após a análise do comprovante.'
             : 'Conta criada com sucesso. Bem-vindo(a) ao Hi Teach!');
-        redirect('profile.php');
+        redirect('../pages/profile.php');
     }
 
     setFlash('error', implode(' ', $errors));
@@ -169,7 +169,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $pageId = 'register';
 $pageTitle = 'Cadastro';
 $isTeacher = ($old['role'] ?? '') === 'teacher';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="register-section" class="section">
@@ -341,4 +342,4 @@ include_once 'cabecalho.php';
     </p>
   </section>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

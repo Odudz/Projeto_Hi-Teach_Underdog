@@ -1,8 +1,9 @@
 <?php
-include_once 'conexao.php';
+include_once __DIR__ . '/../config/conexao.php';
 $pageId = 'forum';
 $pageTitle = 'Fóruns';
-include_once 'cabecalho.php';
+$baseUrl = '../';
+include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
   <section id="forum-filter" class="section">
@@ -30,4 +31,4 @@ include_once 'cabecalho.php';
     </article>
   </section>
 </main>
-<?php include_once 'rodape.php'; ?>
+<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

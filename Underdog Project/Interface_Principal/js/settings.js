@@ -7,8 +7,7 @@
 		try {
 			if (value === null) localStorage.removeItem(key);
 			else localStorage.setItem(key, value);
-		} catch (error) {
-		}
+		} catch (error) {}
 	};
 
 	const setTheme = (theme) => {
@@ -33,7 +32,54 @@
 	});
 
 	if (motionInput) {
-		motionInput.checked = root.getAttribute("data-motion") === "reduced";
+		const mediaQueryMotion = window.matchMedia(
+			"(prefers-reduced-motion: reduce)",
+		);
+
+		const motionContainer = motionInput.closest(".theme-switch");
+		const motionHint = motionContainer
+			? motionContainer.querySelector(".switch-hint")
+			: null;
+		const defaultHintText = motionHint ? motionHint.textContent : "";
+
+		const syncMotion = () => {
+			const isSystemReduced = mediaQueryMotion.matches;
+
+			if (isSystemReduced) {
+				motionInput.checked = true;
+				motionInput.disabled = true;
+				root.setAttribute("data-motion", "reduced");
+
+				if (motionHint) {
+					motionHint.textContent =
+						"Desativado automaticamente pelas configurações de desempenho ou acessibilidade do seu sistema.";
+				}
+			} else {
+				motionInput.disabled = false;
+
+				if (motionHint) {
+					motionHint.textContent = defaultHintText;
+				}
+
+				let savedMotion = null;
+				try {
+					savedMotion = localStorage.getItem("hiteach-motion");
+				} catch (e) {}
+
+				const isReduced =
+					savedMotion === "reduced" ||
+					root.getAttribute("data-motion") === "reduced";
+				motionInput.checked = isReduced;
+
+				if (isReduced) root.setAttribute("data-motion", "reduced");
+				else root.removeAttribute("data-motion");
+			}
+		};
+
+		syncMotion();
+
+		mediaQueryMotion.addEventListener("change", syncMotion);
+
 		motionInput.addEventListener("change", () => {
 			if (motionInput.checked) root.setAttribute("data-motion", "reduced");
 			else root.removeAttribute("data-motion");

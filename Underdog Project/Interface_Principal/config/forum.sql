@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS forum_topics (
     KEY idx_topics_user (user_id),
     CONSTRAINT fk_topics_subject FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE,
     CONSTRAINT fk_topics_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+);
 
 CREATE TABLE IF NOT EXISTS forum_posts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS forum_posts (
     KEY idx_posts_user (user_id),
     CONSTRAINT fk_posts_topic FOREIGN KEY (topic_id) REFERENCES forum_topics (id) ON DELETE CASCADE,
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+);
 
 -- Matérias iniciais (edite à vontade)
 INSERT IGNORE INTO subjects (name, description) VALUES

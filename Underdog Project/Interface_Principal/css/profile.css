@@ -131,6 +131,7 @@
 .profile-name {
   font-size: 40px;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 .profile-role {
   display: inline-block;
@@ -145,6 +146,7 @@
 }
 .profile-bio {
   max-width: 560px;
+  overflow-wrap: anywhere;
 }
 .profile-actions {
   display: flex;

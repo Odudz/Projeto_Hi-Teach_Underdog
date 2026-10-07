@@ -8,6 +8,12 @@ if (!$user || $user['role'] !== 'admin') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['forum_topic_id'])) {
+        $pdo->prepare('DELETE FROM forum_topics WHERE id = ?')->execute([(int) $_POST['forum_topic_id']]);
+        setFlash('success', 'Tópico excluído.');
+        redirect('moderator-dashboard.php#mod-forums');
+    }
+
     $teacherId = (int) ($_POST['user_id'] ?? 0);
     $decision = $_POST['decision'] ?? '';
 
@@ -34,6 +40,12 @@ $pending = $pdo->query(
     "SELECT u.id AS user_id, u.name, u.email, t.specializations
      FROM teacher_profiles t JOIN users u ON u.id = t.user_id
      WHERE t.status = 'pending' ORDER BY u.created_at"
+)->fetchAll();
+
+$forumTopics = $pdo->query(
+    'SELECT t.id, t.title, u.name AS author
+     FROM forum_topics t JOIN users u ON u.id = t.user_id
+     ORDER BY t.created_at DESC LIMIT 20'
 )->fetchAll();
 
 $pageId = 'moderator-dashboard';
@@ -90,6 +102,40 @@ include_once __DIR__ . '/../includes/cabecalho.php';
   ];
   foreach ($moderationSections as [$sectionId, $sectionTitle]):
   ?>
+  <?php if ($sectionId === 'forums'): ?>
+    <section id="mod-forums" class="section">
+      <h2 class="section-title"><?= $sectionTitle ?></h2>
+      <?php if (!$forumTopics): ?>
+        <p id="mod-forums-empty" class="form-note">Nenhum tópico criado ainda.</p>
+      <?php else: ?>
+        <table id="mod-forums-table" class="table">
+          <thead>
+            <tr>
+              <th class="table-head">Título</th>
+              <th class="table-head">Autor</th>
+              <th class="table-head">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+          <?php foreach ($forumTopics as $topic): ?>
+            <tr class="table-row">
+              <td class="table-cell"><?= e($topic['title']) ?></td>
+              <td class="table-cell"><?= e($topic['author']) ?></td>
+              <td class="table-cell">
+                <a class="card-link" href="forum-topic.php?id=<?= (int) $topic['id'] ?>">Revisar</a>
+                <form class="inline-form" action="moderator-dashboard.php" method="post">
+                  <input type="hidden" name="forum_topic_id" value="<?= (int) $topic['id'] ?>">
+                  <button type="submit" class="button button-danger"
+                          onclick="return confirm('Excluir este tópico e todas as mensagens?');">Excluir</button>
+                </form>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      <?php endif; ?>
+    </section>
+  <?php continue; endif; ?>
     <section id="mod-<?= $sectionId ?>" class="section">
       <h2 class="section-title"><?= $sectionTitle ?></h2>
       <table id="mod-<?= $sectionId ?>-table" class="table">

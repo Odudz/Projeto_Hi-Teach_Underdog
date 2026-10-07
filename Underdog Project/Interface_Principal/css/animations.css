@@ -58,7 +58,7 @@ body.is-leaving::after {
   }
 }
 
-@media (prefers-reduced-motion: no-preference) /*Se o usuario tiver com opçoes de desempenho do windows, as animações não funcionaram*/{
+@media (prefers-reduced-motion: reduce) /*Se o usuario tiver com opçoes de desempenho do windows, as animações não funcionaram*/{
   *,
   *::before,
   *::after {

@@ -1,3 +1,4 @@
 # Projeto_Hi-Teach_Underdog
-Projeto da faculdade envolvendo desenvolvimento web, banco de dados e engenharia de requisitos.
+Projeto integrador da PUCPR envolvendo Desenvolvimento Web, Banco de Dados e Engenharia de Requisitos.
+
 

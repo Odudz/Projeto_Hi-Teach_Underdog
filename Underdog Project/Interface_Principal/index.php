@@ -18,51 +18,44 @@ include_once __DIR__ . '/includes/cabecalho.php';
   <section id="features" class="section features">
     <h2 class="section-title">O que você encontra</h2>
 
-    <article class="card feature-card">
+    <a class="card feature-card" href="pages/subjects.php" style="text-decoration: none;">
       <h3 class="card-title">Videoaulas</h3>
       <p class="card-text">Assista quando quiser.</p>
-      <a class="card-link" href="pages/subjects.php">Ver mais</a>
-    </article>
+    </a>
 
-    <article class="card feature-card">
+    <a class="card feature-card" href="pages/live-class.php" style="text-decoration: none;">
       <h3 class="card-title">Aulas ao vivo</h3>
       <p class="card-text">Participe e comente em tempo real.</p>
-      <a class="card-link" href="pages/live-class.php">Ver mais</a>
-    </article>
+    </a>
 
-    <article class="card feature-card">
+    <a class="card feature-card" href="pages/forum.php" style="text-decoration: none;">
       <h3 class="card-title">Fóruns</h3>
       <p class="card-text">Discuta cada matéria.</p>
-      <a class="card-link" href="pages/forum.php">Ver mais</a>
-    </article>
+    </a>
 
-    <article class="card feature-card">
+    <a class="card feature-card" href="pages/classroom.php" style="text-decoration: none;">
       <h3 class="card-title">Salas virtuais</h3>
       <p class="card-text">Materiais e atividades do professor.</p>
-      <a class="card-link" href="pages/classroom.php">Ver mais</a>
-    </article>
+    </a>
   </section>
 
   <section id="subjects-preview" class="section">
     <h2 class="section-title">Matérias</h2>
 
-    <article class="card subject-card">
+    <a class="card subject-card" href="pages/subjects.php" style="text-decoration: none;">
       <h3 class="card-title">Engenharia de Requisitos</h3>
       <p class="card-text">Levantamento e análise de requisitos.</p>
-      <a class="card-link" href="pages/subjects.php">Ver mais</a>
-    </article>
+    </a>
 
-    <article class="card subject-card">
+    <a class="card subject-card" href="pages/subjects.php" style="text-decoration: none;">
       <h3 class="card-title">Desenvolvimento Web</h3>
       <p class="card-text">HTML, CSS, JavaScript e mais.</p>
-      <a class="card-link" href="pages/subjects.php">Ver mais</a>
-    </article>
+    </a>
 
-    <article class="card subject-card">
+    <a class="card subject-card" href="pages/subjects.php" style="text-decoration: none;">
       <h3 class="card-title">Banco de Dados</h3>
       <p class="card-text">Modelagem e SQL.</p>
-      <a class="card-link" href="pages/subjects.php">Ver mais</a>
-    </article>
+    </a>
   </section>
 </main>
 <?php include_once __DIR__ . '/includes/rodape.php'; ?>

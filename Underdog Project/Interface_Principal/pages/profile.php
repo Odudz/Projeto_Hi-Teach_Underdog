@@ -133,7 +133,10 @@ $old = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
-    $bio = trim($_POST['bio'] ?? '');
+    $bio = str_replace(["\r\n", "\r"], "\n", trim($_POST['bio'] ?? ''));
+
+    $bio = preg_replace("/(\n\s*){2,}\n/", "\n\n", $bio); /*Caso tire essa linha, toda quebra de linha que o usuário der conta com 1 caractere!*/
+    $bio = trim($bio);
 
     $errors = [];
 
@@ -183,7 +186,7 @@ $memberSince = date('d/m/Y', strtotime($user['created_at']));
 
 ob_start();
 ?>
-<div id="edit-profile-modal" class="modal-overlay">
+<div id="edit-profile-modal" class="modal-overlay <?= ($openModal ?? '') === 'edit-profile-modal' ? 'is-open' : '' ?>">
   <section
     id="edit-profile-dialog"
     class="modal"
@@ -234,6 +237,9 @@ ob_start();
           name="phone"
           class="form-input"
           maxlength="20"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          oninput="this.value = this.value.replace(/[^0-9]/g, '')"
           value="<?= e($old['phone'] ?? $user['phone']) ?>"
         >
       </div>
@@ -244,8 +250,9 @@ ob_start();
           id="bio"
           name="bio"
           class="form-input"
-          maxlength="250"
+          oninput="const chars = Array.from(this.value); if (chars.length > 250) this.value = chars.slice(0, 250).join(''); document.getElementById('bio-counter').textContent = Array.from(this.value).length + '/250'"
         ><?= e($old['bio'] ?? $user['bio']) ?></textarea>
+        <span id="bio-counter" class="form-counter" aria-live="polite">0/250</span>
       </div>
 
       <button
@@ -258,6 +265,15 @@ ob_start();
     </form>
   </section>
 </div>
+
+<script>
+  (() => {
+    const bio = document.getElementById('bio');
+    const counter = document.getElementById('bio-counter');
+    if (bio && counter) counter.textContent = `${Array.from(bio.value).length}/250`;
+  })();
+</script>
+
 <?php
 $modals = ob_get_clean();
 
@@ -405,28 +421,74 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         ><span aria-hidden="true">+</span></button>
       </div>
 
-      <div class="profile-summary">
-        <h1 id="profile-name" class="profile-name"><?= e($user['name']) ?></h1>
-        <span id="profile-role" class="profile-role"><?= e($roleLabel) ?></span>
-        <p id="profile-bio" class="profile-bio"><?= e($user['bio'] ?: 'Conte um pouco sobre você.') ?></p>
-      </div>
+    <div class="profile-summary">
+      <h1 id="profile-name" class="profile-name"><?= e($user['name']) ?></h1>
+      <span id="profile-role" class="profile-role"><?= e($roleLabel) ?></span>
 
-      <div class="profile-actions">
-        <button
-          type="button"
-          id="edit-profile-button"
-          class="button button-primary"
-          aria-haspopup="dialog"
-          data-modal-open="edit-profile-modal"
-        >
-          Editar perfil
-        </button>
-        <form id="logout-form" action="../auth/logout.php" method="post">
-          <button type="submit" id="logout-button" class="button button-danger">Sair</button>
-        </form>
-      </div>
+      <?php if (!empty($user['bio'])): ?>
+        <?php
+        $bioLimpa = trim($user['bio']);
+        $linhas = explode("\n", $bioLimpa);
+        $temMaisDe3Linhas = count($linhas) > 3;
+        $bioPrevia = $temMaisDe3Linhas
+            ? implode("\n", array_slice($linhas, 0, 3))
+            : $bioLimpa;
+        ?>
+
+        <p id="profile-bio" class="profile-bio"><?= e($bioPrevia) ?><?= $temMaisDe3Linhas ? '...' : '' ?></p>
+
+        <?php if ($temMaisDe3Linhas): ?>
+          <button
+            type="button"
+            class="bio-expand-button"
+            data-modal-open="bio-detail-modal"
+          >
+            Expandir biografia
+          </button>
+        <?php endif; ?>
+      <?php else: ?>
+        <p id="profile-bio" class="profile-bio"><?= e('Conte um pouco sobre você.') ?></p>
+      <?php endif; ?>
+    </div>
+
+    <div class="profile-actions">
+      <button
+        type="button"
+        id="edit-profile-button"
+        class="button button-primary"
+        aria-haspopup="dialog"
+        data-modal-open="edit-profile-modal"
+      >
+        Editar perfil
+      </button>
+      <form id="logout-form" action="../auth/logout.php" method="post">
+        <button type="submit" id="logout-button" class="button button-danger">Sair</button>
+      </form>
     </div>
   </section>
+
+  <div id="bio-detail-modal" class="modal-overlay">
+    <section
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="bio-detail-title"
+    >
+      <header class="modal-header">
+        <h2 id="bio-detail-title" class="modal-title">Biografia</h2>
+        <button
+          type="button"
+          class="modal-close"
+          data-modal-close
+          aria-label="Fechar"
+        >×</button>
+      </header>
+
+      <div class="bio-full-content">
+        <?= e($user['bio']) ?>
+      </div>
+    </section>
+  </div>
 
   <section id="profile-stats" class="profile-stats">
     <div class="stat-card">

@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS forum_posts (
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
--- Matérias iniciais (edite à vontade)
+-- Matérias iniciais 
 INSERT IGNORE INTO subjects (name, description) VALUES
     ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
     ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),

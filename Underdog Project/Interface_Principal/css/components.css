@@ -416,3 +416,10 @@ textarea.form-input {
   transform-box: fill-box;
   transform-origin: center;
 }
+.forum-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}

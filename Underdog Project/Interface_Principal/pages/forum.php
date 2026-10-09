@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/forum-upload.php';
 
 const FORUM_PER_PAGE = 10;
 
@@ -9,6 +10,8 @@ $subjectIds = array_map('intval', array_column($subjects, 'id'));
 $newSubject = 0;
 $newTitle = '';
 $newBody = '';
+$canCreateForum = $user && in_array($user['role'], ['teacher', 'admin'], true);
+$canUploadForumFiles = $canCreateForum;
 
 // Criar novo tópico
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,6 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gate = 'login';
         $baseUrl = '../';
         include_once __DIR__ . '/../includes/acesso-restrito.php';
+    }
+
+    if (forumExceedsPostMaxSize()) {
+        setFlash('error', 'O envio excedeu o limite total permitido pelo servidor. Reduza a quantidade/tamanho dos anexos e tente novamente.');
+        redirect('forum.php');
+    }
+
+    if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
+        setFlash('error', 'Sua sessão expirou para esta ação. Recarregue a página e tente novamente.');
+        redirect('forum.php');
+    }
+
+    if (!$canCreateForum) {
+        setFlash('error', 'Apenas professores aprovados e administradores podem criar fóruns.');
+        redirect('forum.php');
     }
 
     $newSubject = (int) ($_POST['subject_id'] ?? 0);
@@ -29,10 +47,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (mb_strlen($newBody) < 10 || mb_strlen($newBody) > 2000) {
         setFlash('error', 'A descrição deve ter de 10 a 2000 caracteres.');
     } else {
-        $pdo->prepare('INSERT INTO forum_topics (subject_id, user_id, title, body) VALUES (?, ?, ?, ?)')
-            ->execute([$newSubject, $user['id'], $newTitle, $newBody]);
-        setFlash('success', 'Tópico criado!');
-        redirect('forum-topic.php?id=' . $pdo->lastInsertId());
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('INSERT INTO forum_topics (subject_id, user_id, title, body) VALUES (?, ?, ?, ?)')
+                ->execute([$newSubject, $user['id'], $newTitle, $newBody]);
+            $topicId = (int) $pdo->lastInsertId();
+
+            if (!empty($_FILES['attachments']['name'][0])) {
+                if (!$canUploadForumFiles) {
+                    throw new RuntimeException('Apenas professores aprovados e administradores podem enviar anexos no fórum.');
+                }
+                saveForumAttachments($_FILES['attachments'], $topicId, null, $pdo);
+            }
+
+            $pdo->commit();
+            setFlash('success', 'Tópico criado!');
+            redirect('forum-topic.php?id=' . $topicId);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('forum.php:create_topic_failed: ' . $e->getMessage());
+            setFlash('error', 'Não foi possível criar o tópico com os anexos informados.');
+        }
     }
 }
 
@@ -125,8 +162,11 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         <a class="card-link" href="../auth/login.php?next=pages/forum.php">Entre na sua conta</a>
         para criar um tópico e participar das discussões.
       </p>
+    <?php elseif (!$canCreateForum): ?>
+      <p class="form-note">Somente professores aprovados e administradores podem abrir novos fóruns. Você pode participar dos debates já existentes.</p>
     <?php else: ?>
-      <form id="forum-new-form" class="form" action="forum.php" method="post">
+      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="multipart/form-data">
+        <?= csrfInput() ?>
         <div class="form-group">
           <label class="form-label" for="new-subject">Matéria</label>
           <select id="new-subject" name="subject_id" class="form-input" required>
@@ -145,6 +185,13 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         <div class="form-group">
           <label class="form-label" for="new-body">Descrição do debate</label>
           <textarea id="new-body" name="body" class="form-input" rows="5" maxlength="2000" required><?= e($newBody) ?></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="new-attachments">Imagens e arquivos (opcional)</label>
+          <input type="file" id="new-attachments" name="attachments[]" class="form-input" multiple
+                 accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
+          <small class="form-note">Até 5 arquivos, 10 MB por arquivo.</small>
         </div>
 
         <button type="submit" id="forum-new-form-submit" class="button button-primary">Publicar tópico</button>

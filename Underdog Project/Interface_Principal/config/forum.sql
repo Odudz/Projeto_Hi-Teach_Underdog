@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS forum_topics (
     KEY idx_topics_user (user_id),
     CONSTRAINT fk_topics_subject FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE,
     CONSTRAINT fk_topics_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS forum_posts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -34,9 +34,27 @@ CREATE TABLE IF NOT EXISTS forum_posts (
     KEY idx_posts_user (user_id),
     CONSTRAINT fk_posts_topic FOREIGN KEY (topic_id) REFERENCES forum_topics (id) ON DELETE CASCADE,
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-);
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- Matérias iniciais (edite à vontade)
 INSERT IGNORE INTO subjects (name, description) VALUES
-    ('História', 'Do Brasil e do mundo.'),
-    ('Ciências', 'Física, química e biologia.');
+    ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
+    ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
+    ('Banco de Dados', 'Modelagem e SQL.');
+
+
+CREATE TABLE IF NOT EXISTS forum_attachments (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    topic_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED DEFAULT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    stored_name VARCHAR(100) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_size INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_attachment_topic (topic_id),
+    KEY idx_attachment_post (post_id),
+    CONSTRAINT fk_attachment_topic FOREIGN KEY (topic_id) REFERENCES forum_topics (id) ON DELETE CASCADE,
+    CONSTRAINT fk_attachment_post FOREIGN KEY (post_id) REFERENCES forum_posts (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

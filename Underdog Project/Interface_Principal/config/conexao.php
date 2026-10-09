@@ -35,6 +35,26 @@ function setFlash(string $type, string $message): void
     $_SESSION['flash'] = [$type, $message];
 }
 
+function csrfToken(): string
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+function csrfInput(): string
+{
+    return '<input type="hidden" name="csrf_token" value="' . e(csrfToken()) . '">';
+}
+
+function validateCsrfToken(?string $token): bool
+{
+    return is_string($token)
+        && isset($_SESSION['csrf_token'])
+        && hash_equals($_SESSION['csrf_token'], $token);
+}
+
 $user = null;
 if (!empty($_SESSION['uid'])) {
     $stmt = $pdo->prepare(

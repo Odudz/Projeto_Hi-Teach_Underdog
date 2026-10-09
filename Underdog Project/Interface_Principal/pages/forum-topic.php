@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/forum-upload.php';
 
 $topicId = (int) ($_GET['id'] ?? 0);
 
@@ -18,22 +19,11 @@ if (!$topic) {
     redirect('forum.php');
 }
 
-// Professores e administradores moderam o fórum
+// Professores aprovados e administradores moderam o fórum
 $self = 'forum-topic.php?id=' . $topicId;
 $replyText = '';
-$isPendingTeacher = false;
-if ($user && $user['role'] === 'student') {
-    $stmtPendingTeacher = $pdo->prepare(
-        "SELECT 1 FROM teacher_profiles WHERE user_id = ? AND status = 'pending' LIMIT 1"
-    );
-    $stmtPendingTeacher->execute([$user['id']]);
-    $isPendingTeacher = (bool) $stmtPendingTeacher->fetchColumn();
-}
-
-$canModerate = $user && (
-    in_array($user['role'], ['admin', 'teacher'], true) || $isPendingTeacher
-);
-$canUploadForumFiles = $canModerate;
+$canModerate = $user && in_array($user['role'], ['admin', 'teacher'], true);
+$canUploadForumFiles = $user && in_array($user['role'], ['admin', 'teacher'], true);
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -45,6 +35,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
+    if ($action === 'reply' && forumExceedsPostMaxSize()) {
+        setFlash('error', 'O envio excedeu o limite total permitido pelo servidor. Reduza a quantidade/tamanho dos anexos e tente novamente.');
+        redirect($self);
+    }
+
+    if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
+        setFlash('error', 'Sua sessão expirou para esta ação. Recarregue a página e tente novamente.');
+        redirect($self);
+    }
+
     if ($action === 'reply') {
         $replyText = trim($_POST['body'] ?? '');
 
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('error', 'A mensagem deve ter de 2 a 2000 caracteres.');
         } else {
             if (!empty($_FILES['attachments']['name'][0]) && !$canUploadForumFiles) {
-                setFlash('error', 'Apenas professores ou professores em análise podem enviar arquivos nos fóruns.');
+                setFlash('error', 'Apenas professores aprovados e administradores podem enviar anexos no fórum.');
                 redirect($self);
             }
 
@@ -64,7 +64,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([$topicId, $user['id'], $replyText]);
                 $postId = (int) $pdo->lastInsertId();
                 if (!empty($_FILES['attachments']['name'][0])) {
-                    require_once __DIR__ . '/../includes/forum-upload.php';
                     saveForumAttachments($_FILES['attachments'], $topicId, $postId, $pdo);
                 }
                 $pdo->commit();
@@ -73,7 +72,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
-                setFlash('error', $e->getMessage());
+                error_log('forum-topic.php:reply_failed: ' . $e->getMessage());
+                setFlash('error', 'Não foi possível enviar sua resposta com os anexos informados.');
             }
         }
     } elseif ($canModerate && $action === 'toggle_close') {
@@ -81,13 +81,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('success', $topic['is_closed'] ? 'Tópico reaberto.' : 'Tópico fechado.');
         redirect($self);
     } elseif ($canModerate && $action === 'delete_post') {
-        $pdo->prepare('DELETE FROM forum_posts WHERE id = ? AND topic_id = ?')
-            ->execute([(int) ($_POST['post_id'] ?? 0), $topicId]);
-        setFlash('success', 'Mensagem excluída.');
+        $postId = (int) ($_POST['post_id'] ?? 0);
+        if ($postId <= 0) {
+            setFlash('error', 'Mensagem inválida.');
+            redirect($self . '#topic-messages');
+        }
+
+        try {
+            $pdo->beginTransaction();
+            $stmtStored = $pdo->prepare('SELECT stored_name FROM forum_attachments WHERE topic_id = ? AND post_id = ?');
+            $stmtStored->execute([$topicId, $postId]);
+            $storedNames = array_column($stmtStored->fetchAll(PDO::FETCH_ASSOC), 'stored_name');
+
+            $stmtDelete = $pdo->prepare('DELETE FROM forum_posts WHERE id = ? AND topic_id = ?');
+            $stmtDelete->execute([$postId, $topicId]);
+            if ($stmtDelete->rowCount() < 1) {
+                throw new RuntimeException('Mensagem não encontrada.');
+            }
+
+            $pdo->commit();
+            forumCleanupFiles($storedNames);
+            setFlash('success', 'Mensagem excluída.');
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('forum-topic.php:delete_post_failed: ' . $e->getMessage());
+            setFlash('error', 'Não foi possível excluir a mensagem.');
+        }
         redirect($self . '#topic-messages');
     } elseif ($canModerate && $action === 'delete_topic') {
-        $pdo->prepare('DELETE FROM forum_topics WHERE id = ?')->execute([$topicId]);
-        setFlash('success', 'Tópico excluído.');
+        try {
+            $pdo->beginTransaction();
+            $stmtStored = $pdo->prepare('SELECT stored_name FROM forum_attachments WHERE topic_id = ?');
+            $stmtStored->execute([$topicId]);
+            $storedNames = array_column($stmtStored->fetchAll(PDO::FETCH_ASSOC), 'stored_name');
+
+            $stmtDelete = $pdo->prepare('DELETE FROM forum_topics WHERE id = ?');
+            $stmtDelete->execute([$topicId]);
+            if ($stmtDelete->rowCount() < 1) {
+                throw new RuntimeException('Tópico não encontrado.');
+            }
+
+            $pdo->commit();
+            forumCleanupFiles($storedNames);
+            setFlash('success', 'Tópico excluído.');
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('forum-topic.php:delete_topic_failed: ' . $e->getMessage());
+            setFlash('error', 'Não foi possível excluir o tópico.');
+            redirect($self);
+        }
         redirect('forum.php');
     } else {
         setFlash('error', 'Solicitação inválida.');
@@ -105,7 +151,7 @@ $stmt = $pdo->prepare(
 $stmt->execute([$topicId]);
 $posts = $stmt->fetchAll();
 
-$stmt = $pdo->prepare('SELECT id, original_name, mime_type, file_size FROM forum_attachments WHERE topic_id = ? ORDER BY id');
+$stmt = $pdo->prepare('SELECT id, original_name, mime_type, file_size FROM forum_attachments WHERE topic_id = ? AND post_id IS NULL ORDER BY id');
 $stmt->execute([$topicId]);
 $topicAttachments = $stmt->fetchAll();
 
@@ -131,6 +177,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
 
     <?php if ($canModerate): ?>
       <form id="topic-moderation" class="inline-form" action="<?= e($self) ?>" method="post">
+        <?= csrfInput() ?>
         <button type="submit" name="action" value="toggle_close" class="button button-secondary">
           <?= $topic['is_closed'] ? 'Reabrir tópico' : 'Fechar tópico' ?>
         </button>
@@ -174,6 +221,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
           <?php endif; ?>
           <?php if ($canModerate): ?>
             <form class="inline-form" action="<?= e($self) ?>" method="post">
+              <?= csrfInput() ?>
               <input type="hidden" name="post_id" value="<?= (int) $post['id'] ?>">
               <button type="submit" name="action" value="delete_post" class="button button-danger button-small"
                       onclick="return confirm('Excluir esta mensagem?');">Excluir</button>
@@ -195,6 +243,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       </p>
     <?php else: ?>
       <form id="reply-form" class="form" action="<?= e($self) ?>" method="post" enctype="multipart/form-data">
+        <?= csrfInput() ?>
         <input type="hidden" name="action" value="reply">
         <div class="form-group">
           <label class="form-label" for="reply-text">Mensagem</label>
@@ -215,4 +264,3 @@ include_once __DIR__ . '/../includes/cabecalho.php';
   </section>
 </main>
 <?php include_once __DIR__ . '/../includes/rodape.php'; ?>
-

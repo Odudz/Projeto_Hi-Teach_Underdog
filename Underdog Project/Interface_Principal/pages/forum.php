@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/forum-upload.php';
 
 const FORUM_PER_PAGE = 10;
 
@@ -9,20 +10,8 @@ $subjectIds = array_map('intval', array_column($subjects, 'id'));
 $newSubject = 0;
 $newTitle = '';
 $newBody = '';
-$newFiles = [];
-
-$isPendingTeacher = false;
-if ($user && $user['role'] === 'student') {
-    $stmtPendingTeacher = $pdo->prepare(
-        "SELECT 1 FROM teacher_profiles WHERE user_id = ? AND status = 'pending' LIMIT 1"
-    );
-    $stmtPendingTeacher->execute([$user['id']]);
-    $isPendingTeacher = (bool) $stmtPendingTeacher->fetchColumn();
-}
-
-$canCreateForum = $user && (
-    in_array($user['role'], ['teacher', 'admin'], true) || $isPendingTeacher
-);
+$canCreateForum = $user && in_array($user['role'], ['teacher', 'admin'], true);
+$canUploadForumFiles = $canCreateForum;
 
 // Criar novo tópico
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -32,8 +21,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         include_once __DIR__ . '/../includes/acesso-restrito.php';
     }
 
+    if (forumExceedsPostMaxSize()) {
+        setFlash('error', 'O envio excedeu o limite total permitido pelo servidor. Reduza a quantidade/tamanho dos anexos e tente novamente.');
+        redirect('forum.php');
+    }
+
+    if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
+        setFlash('error', 'Sua sessão expirou para esta ação. Recarregue a página e tente novamente.');
+        redirect('forum.php');
+    }
+
     if (!$canCreateForum) {
-        setFlash('error', 'Apenas professores ou professores em análise podem criar fóruns.');
+        setFlash('error', 'Apenas professores aprovados e administradores podem criar fóruns.');
         redirect('forum.php');
     }
 
@@ -55,8 +54,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $topicId = (int) $pdo->lastInsertId();
 
             if (!empty($_FILES['attachments']['name'][0])) {
-                require_once __DIR__ . '/../includes/forum-upload.php';
-                $newFiles = saveForumAttachments($_FILES['attachments'], $topicId, null, $pdo);
+                if (!$canUploadForumFiles) {
+                    throw new RuntimeException('Apenas professores aprovados e administradores podem enviar anexos no fórum.');
+                }
+                saveForumAttachments($_FILES['attachments'], $topicId, null, $pdo);
             }
 
             $pdo->commit();
@@ -66,7 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            setFlash('error', $e->getMessage());
+            error_log('forum.php:create_topic_failed: ' . $e->getMessage());
+            setFlash('error', 'Não foi possível criar o tópico com os anexos informados.');
         }
     }
 }
@@ -161,9 +163,10 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         para criar um tópico e participar das discussões.
       </p>
     <?php elseif (!$canCreateForum): ?>
-      <p class="form-note">Somente professores ou professores em análise podem abrir novos fóruns. Você pode participar dos debates já existentes.</p>
+      <p class="form-note">Somente professores aprovados e administradores podem abrir novos fóruns. Você pode participar dos debates já existentes.</p>
     <?php else: ?>
       <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="multipart/form-data">
+        <?= csrfInput() ?>
         <div class="form-group">
           <label class="form-label" for="new-subject">Matéria</label>
           <select id="new-subject" name="subject_id" class="form-input" required>

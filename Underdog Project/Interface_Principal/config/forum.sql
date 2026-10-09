@@ -36,13 +36,6 @@ CREATE TABLE IF NOT EXISTS forum_posts (
     CONSTRAINT fk_posts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
--- Matérias iniciais 
-INSERT IGNORE INTO subjects (name, description) VALUES
-    ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
-    ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
-    ('Banco de Dados', 'Modelagem e SQL.');
-
-
 CREATE TABLE IF NOT EXISTS forum_attachments (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     topic_id INT UNSIGNED NOT NULL,
@@ -55,6 +48,19 @@ CREATE TABLE IF NOT EXISTS forum_attachments (
     PRIMARY KEY (id),
     KEY idx_attachment_topic (topic_id),
     KEY idx_attachment_post (post_id),
+    KEY idx_attachment_topic_post (topic_id, post_id),
     CONSTRAINT fk_attachment_topic FOREIGN KEY (topic_id) REFERENCES forum_topics (id) ON DELETE CASCADE,
     CONSTRAINT fk_attachment_post FOREIGN KEY (post_id) REFERENCES forum_posts (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- Migração segura para bases já existentes: padroniza engine/collation e garante colunas do PR.
+ALTER TABLE subjects CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE forum_topics ENGINE = InnoDB, CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE forum_posts ENGINE = InnoDB, CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE forum_attachments ENGINE = InnoDB, CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Matérias iniciais (INSERT IGNORE não remove matérias já existentes)
+INSERT IGNORE INTO subjects (name, description) VALUES
+    ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
+    ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
+    ('Banco de Dados', 'Modelagem e SQL.');

@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/forum-upload.php';
 
 const FORUM_PER_PAGE = 10;
 
@@ -10,12 +11,55 @@ $newSubject = 0;
 $newTitle = '';
 $newBody = '';
 
+$studentForumCount = 0;
+if ($user && $user['role'] === 'student') {
+    $stmtStudentForums = $pdo->prepare('SELECT COUNT(*) FROM forum_topics WHERE user_id = ?');
+    $stmtStudentForums->execute([$user['id']]);
+    $studentForumCount = (int) $stmtStudentForums->fetchColumn();
+}
+
+$studentForumLimit = 3;
+$studentCanCreateForum = $user && $user['role'] === 'student' && $studentForumCount < $studentForumLimit;
+$canCreateForum = $user && (
+    in_array($user['role'], ['teacher', 'admin'], true) || $studentCanCreateForum
+);
+$canUploadForumFiles = $user && in_array($user['role'], ['teacher', 'admin'], true);
+
 // Criar novo tópico
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$user) {
         $gate = 'login';
         $baseUrl = '../';
         include_once __DIR__ . '/../includes/acesso-restrito.php';
+    }
+
+    if (forumExceedsPostMaxSize()) {
+        setFlash('error', 'O envio excedeu o limite total permitido pelo servidor. Reduza a quantidade/tamanho dos anexos e tente novamente.');
+        redirect('forum.php');
+    }
+
+    if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
+        setFlash('error', 'Sua sessão expirou para esta ação. Recarregue a página e tente novamente.');
+        redirect('forum.php');
+    }
+
+    if (!$canCreateForum) {
+        if ($user['role'] === 'student') {
+            setFlash('error', 'Você já atingiu o limite de 3 fóruns criados como aluno.');
+        } else {
+            setFlash('error', 'Apenas professores aprovados, administradores e alunos dentro do limite podem criar fóruns.');
+        }
+        redirect('forum.php');
+    }
+
+    // Revalida o limite no servidor para evitar ultrapassá-lo com abas/requisições simultâneas.
+    if ($user['role'] === 'student') {
+        $stmtStudentForums = $pdo->prepare('SELECT COUNT(*) FROM forum_topics WHERE user_id = ?');
+        $stmtStudentForums->execute([$user['id']]);
+        if ((int) $stmtStudentForums->fetchColumn() >= $studentForumLimit) {
+            setFlash('error', 'Você já atingiu o limite de 3 fóruns criados como aluno.');
+            redirect('forum.php');
+        }
     }
 
     $newSubject = (int) ($_POST['subject_id'] ?? 0);
@@ -29,10 +73,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (mb_strlen($newBody) < 10 || mb_strlen($newBody) > 2000) {
         setFlash('error', 'A descrição deve ter de 10 a 2000 caracteres.');
     } else {
-        $pdo->prepare('INSERT INTO forum_topics (subject_id, user_id, title, body) VALUES (?, ?, ?, ?)')
-            ->execute([$newSubject, $user['id'], $newTitle, $newBody]);
-        setFlash('success', 'Tópico criado!');
-        redirect('forum-topic.php?id=' . $pdo->lastInsertId());
+        $pdo->beginTransaction();
+        try {
+            // Impede que duas requisições simultâneas façam o aluno ultrapassar o limite.
+            if ($user['role'] === 'student') {
+                $stmtLockUser = $pdo->prepare('SELECT id FROM users WHERE id = ? FOR UPDATE');
+                $stmtLockUser->execute([$user['id']]);
+
+                $stmtStudentForums = $pdo->prepare('SELECT COUNT(*) FROM forum_topics WHERE user_id = ?');
+                $stmtStudentForums->execute([$user['id']]);
+                if ((int) $stmtStudentForums->fetchColumn() >= $studentForumLimit) {
+                    throw new RuntimeException('Você já atingiu o limite de 3 fóruns criados como aluno.');
+                }
+            }
+
+            $pdo->prepare('INSERT INTO forum_topics (subject_id, user_id, title, body) VALUES (?, ?, ?, ?)')
+                ->execute([$newSubject, $user['id'], $newTitle, $newBody]);
+            $topicId = (int) $pdo->lastInsertId();
+
+            if (!empty($_FILES['attachments']['name'][0])) {
+                if (!$canUploadForumFiles) {
+                    throw new RuntimeException('Apenas professores aprovados e administradores podem enviar anexos no fórum.');
+                }
+                saveForumAttachments($_FILES['attachments'], $topicId, null, $pdo);
+            }
+
+            $pdo->commit();
+            setFlash('success', 'Tópico criado!');
+            redirect('forum-topic.php?id=' . $topicId);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('forum.php:create_topic_failed: ' . $e->getMessage());
+            setFlash('error', 'Não foi possível criar o tópico com os anexos informados.');
+        }
     }
 }
 
@@ -48,7 +123,8 @@ $page = min(max(1, (int) ($_GET['page'] ?? 1)), $totalPages);
 $offset = ($page - 1) * FORUM_PER_PAGE;
 
 $stmt = $pdo->prepare(
-    "SELECT t.id, t.title, t.is_closed, t.created_at, s.name AS subject, u.name AS author,
+    "SELECT t.id, t.title, t.is_closed, t.created_at, s.name AS subject,
+            u.id AS author_id, u.name AS author, u.avatar_mime AS author_avatar_mime,
             (SELECT COUNT(*) FROM forum_posts p WHERE p.topic_id = t.id) AS replies
      FROM forum_topics t
      JOIN subjects s ON s.id = t.subject_id
@@ -94,9 +170,24 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     <?php foreach ($topics as $topic): ?>
       <article class="card forum-card">
         <h3 class="card-title"><?= e($topic['title']) ?><?= $topic['is_closed'] ? ' 🔒' : '' ?></h3>
+        <div class="forum-author">
+          <a class="forum-author-link" href="profile-view.php?id=<?= (int) $topic['author_id'] ?>">
+            <?php if (!empty($topic['author_avatar_mime'])): ?>
+              <img
+                class="forum-avatar"
+                src="../endpoints/image.php?user=<?= (int) $topic['author_id'] ?>&amp;type=avatar"
+                alt="Foto de perfil de <?= e($topic['author']) ?>"
+              >
+            <?php else: ?>
+              <span class="forum-avatar forum-avatar-initials" aria-hidden="true">
+                <?= e(mb_strtoupper(mb_substr(trim($topic['author']), 0, 1))) ?>
+              </span>
+            <?php endif; ?>
+            <span><?= e($topic['author']) ?></span>
+          </a>
+        </div>
         <p class="card-text">
           Matéria: <?= e($topic['subject']) ?> |
-          Criado por: <?= e($topic['author']) ?> |
           Data: <?= e(date('d/m/Y H:i', strtotime($topic['created_at']))) ?> |
           Respostas: <?= (int) $topic['replies'] ?>
         </p>
@@ -125,8 +216,18 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         <a class="card-link" href="../auth/login.php?next=pages/forum.php">Entre na sua conta</a>
         para criar um tópico e participar das discussões.
       </p>
+    <?php elseif (!$canCreateForum): ?>
+      <?php if ($user['role'] === 'student'): ?>
+        <p class="form-note">Você atingiu o limite de <?= $studentForumLimit ?> fóruns criados como aluno. Você ainda pode participar dos debates existentes.</p>
+      <?php else: ?>
+        <p class="form-note">Somente professores aprovados, administradores e alunos dentro do limite podem abrir novos fóruns. Você pode participar dos debates já existentes.</p>
+      <?php endif; ?>
     <?php else: ?>
-      <form id="forum-new-form" class="form" action="forum.php" method="post">
+      <?php if ($user['role'] === 'student'): ?>
+        <p class="form-note">Você criou <?= $studentForumCount ?> de <?= $studentForumLimit ?> fóruns permitidos como aluno.</p>
+      <?php endif; ?>
+      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="multipart/form-data">
+        <?= csrfInput() ?>
         <div class="form-group">
           <label class="form-label" for="new-subject">Matéria</label>
           <select id="new-subject" name="subject_id" class="form-input" required>
@@ -146,6 +247,15 @@ include_once __DIR__ . '/../includes/cabecalho.php';
           <label class="form-label" for="new-body">Descrição do debate</label>
           <textarea id="new-body" name="body" class="form-input" rows="5" maxlength="2000" required><?= e($newBody) ?></textarea>
         </div>
+
+        <?php if ($canUploadForumFiles): ?>
+          <div class="form-group">
+            <label class="form-label" for="new-attachments">Imagens e arquivos (opcional)</label>
+            <input type="file" id="new-attachments" name="attachments[]" class="form-input" multiple
+                   accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
+            <small class="form-note">Até 5 arquivos, 10 MB por arquivo.</small>
+          </div>
+        <?php endif; ?>
 
         <button type="submit" id="forum-new-form-submit" class="button button-primary">Publicar tópico</button>
       </form>

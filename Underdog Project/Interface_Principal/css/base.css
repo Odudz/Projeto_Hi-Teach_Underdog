@@ -13,6 +13,9 @@
   --color-header-text: #e6e8e3;
   --color-on-primary: #e6e8e3;
   --color-primary-hover: #92aaa5;
+  --color-danger: #c4382b;
+  --color-danger-hover: #d9443a;
+  --color-on-danger: #ffffff;
   --border-width: 3px;
   --border: var(--border-width) solid var(--color-border);
   --shadow-sm: 2px 2px 0 var(--color-border);

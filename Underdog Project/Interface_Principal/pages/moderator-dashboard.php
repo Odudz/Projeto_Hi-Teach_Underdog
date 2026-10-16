@@ -50,11 +50,13 @@ $forumTopics = $pdo->query(
 
 $pageId = 'moderator-dashboard';
 $pageTitle = 'Painel do moderador';
+$extraCss = ['tabs'];
+$extraJs = ['tabs'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
-  <section id="pending-teachers" class="section">
+  <section id="pending-teachers" class="section" data-tab="Professores" data-tab-badge="<?= count($pending) ?>">
     <h2 class="section-title">Professores aguardando aprovação</h2>
     <?php if (!$pending): ?>
       <p id="pending-empty" class="form-note">Nenhuma solicitação pendente.</p>
@@ -92,18 +94,18 @@ include_once __DIR__ . '/../includes/cabecalho.php';
 
   <?php
   $moderationSections = [
-      ['videos', 'Vídeos'],
-      ['lives', 'Transmissões ao vivo'],
-      ['rooms', 'Salas virtuais'],
-      ['materials', 'Materiais'],
-      ['activities', 'Atividades'],
-      ['forums', 'Fóruns e mensagens'],
-      ['comments', 'Comentários'],
+      ['videos', 'Vídeos', 'Vídeos'],
+      ['lives', 'Transmissões ao vivo', 'Transmissões'],
+      ['rooms', 'Salas virtuais', 'Salas'],
+      ['materials', 'Materiais', 'Materiais'],
+      ['activities', 'Atividades', 'Atividades'],
+      ['forums', 'Fóruns e mensagens', 'Fóruns'],
+      ['comments', 'Comentários', 'Comentários'],
   ];
-  foreach ($moderationSections as [$sectionId, $sectionTitle]):
+  foreach ($moderationSections as [$sectionId, $sectionTitle, $tabLabel]):
   ?>
   <?php if ($sectionId === 'forums'): ?>
-    <section id="mod-forums" class="section">
+    <section id="mod-forums" class="section" data-tab="<?= e($tabLabel) ?>">
       <h2 class="section-title"><?= $sectionTitle ?></h2>
       <?php if (!$forumTopics): ?>
         <p id="mod-forums-empty" class="form-note">Nenhum tópico criado ainda.</p>
@@ -136,7 +138,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       <?php endif; ?>
     </section>
   <?php continue; endif; ?>
-    <section id="mod-<?= $sectionId ?>" class="section">
+    <section id="mod-<?= $sectionId ?>" class="section" data-tab="<?= e($tabLabel) ?>">
       <h2 class="section-title"><?= $sectionTitle ?></h2>
       <table id="mod-<?= $sectionId ?>-table" class="table">
         <thead>

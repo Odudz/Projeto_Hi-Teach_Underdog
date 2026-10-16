@@ -103,6 +103,48 @@ $kind = $_POST['action'] ?? '';
 $isFetch = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
 $isImageUpload = $_SERVER['REQUEST_METHOD'] === 'POST' && ($isFetch || isset($imageKinds[$kind]));
 
+$deleteImageKinds = [
+    'delete-avatar' => ['avatar', 'Foto de perfil excluída!'],
+    'delete-banner' => ['banner', 'Banner excluído!'],
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($deleteImageKinds[$kind])) {
+    [$column, $deleteMessage] = $deleteImageKinds[$kind];
+    $pdo->prepare("UPDATE users SET {$column}_data = NULL, {$column}_mime = NULL WHERE id = ?")
+        ->execute([$user['id']]);
+
+    if ($isFetch) {
+        jsonResponse(200, ['ok' => true, 'message' => $deleteMessage]);
+    }
+    setFlash('success', $deleteMessage);
+    redirect('profile.php');
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind === 'delete-account') {
+    try {
+        $pdo->beginTransaction();
+        $pdo->prepare('DELETE FROM teacher_profiles WHERE user_id = ?')->execute([$user['id']]);
+        $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$user['id']]);
+        $pdo->commit();
+    } catch (PDOException $exception) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        setFlash('error', 'Não foi possível excluir sua conta. Tente novamente.');
+        redirect('profile.php');
+        exit;
+    }
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
+    setFlash('success', 'Sua conta foi excluída.');
+    redirect('../index.php');
+    exit;
+}
+
 if ($isImageUpload) {
 
     if (empty($_POST) && (int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
@@ -263,6 +305,20 @@ ob_start();
         Salvar alterações
       </button>
     </form>
+
+    <div id="danger-zone" class="danger-zone">
+      <h3 class="danger-zone-title">Zona de perigo</h3>
+      <p class="danger-zone-text">Excluir sua conta apaga seus dados de forma permanente.</p>
+      <button
+        type="button"
+        id="delete-account-button"
+        class="button button-delete"
+        aria-haspopup="dialog"
+        data-modal-open="delete-account-modal"
+      >
+        Excluir minha conta
+      </button>
+    </div>
   </section>
 </div>
 
@@ -376,6 +432,81 @@ foreach ($imageEditors as $kind => $editor):
 <?php
 endforeach;
 $modals .= ob_get_clean();
+
+$deleteImageModals = [
+    'avatar' => [
+        'title' => 'Excluir foto de perfil',
+        'text' => 'Sua foto de perfil será removida e voltaremos a mostrar as suas iniciais. Você pode enviar uma nova foto quando quiser.',
+    ],
+    'banner' => [
+        'title' => 'Excluir banner',
+        'text' => 'O banner do seu perfil será removido. Você pode enviar um novo banner quando quiser.',
+    ],
+];
+ob_start();
+foreach ($deleteImageModals as $imageKind => $confirm):
+?>
+<div id="delete-<?= $imageKind ?>-modal" class="modal-overlay" data-delete-image="<?= $imageKind ?>">
+  <section
+    class="modal modal-confirm"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="delete-<?= $imageKind ?>-title"
+    aria-describedby="delete-<?= $imageKind ?>-text"
+  >
+    <header class="modal-header">
+      <h2 id="delete-<?= $imageKind ?>-title" class="modal-title"><?= e($confirm['title']) ?></h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
+    </header>
+
+    <div class="confirm-body">
+      <div class="alert alert-error" role="alert" data-delete-error hidden></div>
+      <p id="delete-<?= $imageKind ?>-text" class="confirm-text"><?= e($confirm['text']) ?></p>
+
+      <form class="confirm-actions" action="profile.php" method="post" data-delete-form>
+        <input type="hidden" name="action" value="delete-<?= $imageKind ?>">
+        <button type="button" class="button" data-modal-close>Cancelar</button>
+        <button type="submit" class="button button-delete" data-delete-submit>Sim, excluir</button>
+      </form>
+    </div>
+  </section>
+</div>
+<?php
+endforeach;
+?>
+<div id="delete-account-modal" class="modal-overlay">
+  <section
+    class="modal modal-confirm"
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="delete-account-title"
+    aria-describedby="delete-account-text"
+  >
+    <header class="modal-header">
+      <h2 id="delete-account-title" class="modal-title">Excluir conta</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
+    </header>
+
+    <div class="confirm-body">
+      <div class="confirm-warning">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Esta ação é irreversível.</span>
+      </div>
+      <p id="delete-account-text" class="confirm-text">
+        Ao excluir sua conta, seu perfil, sua foto, seu banner e todos os dados ligados a ela serão apagados para sempre. Não será possível recuperar nada depois.
+      </p>
+      <p class="confirm-text"><strong>Tem certeza de que deseja excluir sua conta?</strong></p>
+
+      <form class="confirm-actions" action="profile.php" method="post">
+        <input type="hidden" name="action" value="delete-account">
+        <button type="button" class="button" data-modal-close>Cancelar</button>
+        <button type="submit" id="delete-account-confirm" class="button button-delete">Sim, excluir minha conta</button>
+      </form>
+    </div>
+  </section>
+</div>
+<?php
+$modals .= ob_get_clean();
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
@@ -397,10 +528,22 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         aria-haspopup="dialog"
         data-modal-open="banner-modal"
       ><span aria-hidden="true">+</span></button>
+      <button
+        type="button"
+        id="banner-delete-button"
+        class="button button-small button-delete profile-banner-delete"
+        aria-label="Excluir banner"
+        aria-haspopup="dialog"
+        data-modal-open="delete-banner-modal"
+        <?= $user['banner_mime'] ? '' : 'hidden' ?>
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        Excluir banner
+      </button>
     </div>
 
     <div class="profile-identity">
-      <div id="profile-avatar" class="profile-avatar">
+      <div id="profile-avatar" class="profile-avatar" data-initials="<?= e($initials) ?>">
         <?php if ($user['avatar_mime']): ?>
           <img
             id="profile-avatar-image"
@@ -419,6 +562,15 @@ include_once __DIR__ . '/../includes/cabecalho.php';
           aria-haspopup="dialog"
           data-modal-open="avatar-modal"
         ><span aria-hidden="true">+</span></button>
+        <button
+          type="button"
+          id="avatar-delete-button"
+          class="profile-avatar-delete"
+          aria-label="Excluir foto de perfil"
+          aria-haspopup="dialog"
+          data-modal-open="delete-avatar-modal"
+          <?= $user['avatar_mime'] ? '' : 'hidden' ?>
+        ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
       </div>
 
     <div class="profile-summary">

@@ -9,11 +9,13 @@ if (!$user || $user['role'] !== 'teacher') {
 
 $pageId = 'teacher-dashboard';
 $pageTitle = 'Painel do professor';
+$extraCss = ['tabs'];
+$extraJs = ['tabs'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
-  <section id="teacher-videos" class="section">
+  <section id="teacher-videos" class="section" data-tab="Vídeos">
     <h2 class="section-title">Meus vídeos</h2>
     <form id="video-upload-form" class="form" action="#" method="post">
       <div class="form-group">
@@ -53,7 +55,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     </table>
   </section>
 
-  <section id="teacher-lives" class="section">
+  <section id="teacher-lives" class="section" data-tab="Transmissões">
     <h2 class="section-title">Minhas transmissões</h2>
     <form id="live-create-form" class="form" action="#" method="post">
       <div class="form-group">
@@ -91,7 +93,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     </table>
   </section>
 
-  <section id="teacher-rooms" class="section">
+  <section id="teacher-rooms" class="section" data-tab="Salas virtuais">
     <h2 class="section-title">Salas virtuais</h2>
     <form id="room-form" class="form" action="#" method="post">
       <div class="form-group">
@@ -130,7 +132,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     </form>
   </section>
 
-  <section id="teacher-answers" class="section">
+  <section id="teacher-answers" class="section" data-tab="Respostas">
     <h2 class="section-title">Respostas dos alunos</h2>
     <table id="answer-table" class="table">
       <thead>
@@ -152,7 +154,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     </table>
   </section>
 
-  <section id="teacher-forums" class="section">
+  <section id="teacher-forums" class="section" data-tab="Fóruns">
     <h2 class="section-title">Criar fórum</h2>
     <form id="forum-create-form" class="form" action="#" method="post">
       <div class="form-group">

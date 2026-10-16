@@ -44,7 +44,44 @@
 		image.src = url;
 	};
 
+	const toggleDeleteButton = (kind, visible) => {
+		const button = document.getElementById(`${kind}-delete-button`);
+		if (button) button.hidden = !visible;
+	};
+
+	const restoreHeaderInitials = (initials) => {
+		const link = document.getElementById("header-avatar");
+		if (!link) return;
+		link.querySelector(".header-avatar-image")?.remove();
+		if (!link.querySelector(".header-avatar-initials")) {
+			const span = document.createElement("span");
+			span.className = "header-avatar-initials";
+			span.textContent = initials;
+			link.prepend(span);
+		}
+	};
+
+	const removeResult = (kind) => {
+		if (kind === "avatar") {
+			const holder = document.getElementById("profile-avatar");
+			const initials = holder.dataset.initials || "";
+			document.getElementById("profile-avatar-image")?.remove();
+			if (!document.getElementById("profile-avatar-initials")) {
+				const span = document.createElement("span");
+				span.id = "profile-avatar-initials";
+				span.className = "profile-avatar-initials";
+				span.textContent = initials;
+				holder.prepend(span);
+			}
+			restoreHeaderInitials(initials);
+		} else {
+			document.getElementById("profile-banner-image")?.remove();
+		}
+		toggleDeleteButton(kind, false);
+	};
+
 	const applyResult = (kind, url) => {
+		toggleDeleteButton(kind, true);
 		if (kind === "avatar") {
 			syncHeaderAvatar(url);
 			const holder = document.getElementById("profile-avatar");
@@ -598,5 +635,64 @@
 		}).observe(overlay, { attributes: true, attributeFilter: ["class"] });
 	};
 
+	const initDeleteImage = (overlay) => {
+		const kind = overlay.dataset.deleteImage;
+		const form = overlay.querySelector("[data-delete-form]");
+		const errorBox = overlay.querySelector("[data-delete-error]");
+		const submit = overlay.querySelector("[data-delete-submit]");
+		const idleLabel = submit.textContent;
+		let busy = false;
+
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			if (busy) return;
+			busy = true;
+			submit.disabled = true;
+			submit.textContent = "Excluindo…";
+			errorBox.hidden = true;
+			try {
+				const endpoint = new URL(form.getAttribute("action"), window.location.href);
+				const response = await fetch(endpoint.toString(), {
+					method: "POST",
+					headers: { "X-Requested-With": "fetch" },
+					body: new FormData(form),
+				});
+				const text = await response.text();
+				let data = null;
+				try {
+					data = text ? JSON.parse(text) : null;
+				} catch {
+					throw new Error("O servidor não conseguiu concluir a exclusão.");
+				}
+				if (!response.ok || !data?.ok) {
+					throw new Error(
+						data?.error || "Não foi possível excluir. Entre na sua conta e tente de novo.",
+					);
+				}
+				removeResult(kind);
+				showFlash("success", data.message);
+				overlay.querySelector("[data-modal-close]").click();
+			} catch (error) {
+				errorBox.textContent =
+					error instanceof TypeError
+						? "Sem conexão com o servidor. Tente novamente."
+						: error.message;
+				errorBox.hidden = false;
+			} finally {
+				busy = false;
+				submit.disabled = false;
+				submit.textContent = idleLabel;
+			}
+		});
+
+		new MutationObserver(() => {
+			if (overlay.classList.contains("is-open")) return;
+			setTimeout(() => {
+				if (!overlay.classList.contains("is-open")) errorBox.hidden = true;
+			}, CLOSE_DELAY_MS);
+		}).observe(overlay, { attributes: true, attributeFilter: ["class"] });
+	};
+
 	document.querySelectorAll("[data-image-editor]").forEach(initEditor);
+	document.querySelectorAll("[data-delete-image]").forEach(initDeleteImage);
 })();

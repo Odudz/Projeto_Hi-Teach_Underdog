@@ -23,7 +23,6 @@ if (!$user) {
     $navItems[] = ['auth/login.php', 'Entrar', 'login'];
 }
 
-// Ícones do menu (conteúdo interno de um SVG 24x24)
 $navIcons = [
     'home' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
     'subjects' => '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
@@ -35,7 +34,6 @@ $navIcons = [
     'login' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
 ];
 
-// Páginas internas destacam no menu a seção a que pertencem
 $sectionOf = [
     'course.php' => 'subjects.php',
     'video.php' => 'subjects.php',
@@ -86,7 +84,7 @@ if ($user) {
           <img class="header-avatar-image" src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
         <?php else: ?>
           <span class="header-avatar-initials"><?= e($headerInitials) ?></span>
-        <?php endif; ?>
+        <?php endif; ?>Add icons to navigation items in cabecalho.php
       </a>
     <?php endif; ?>
     <button type="button" id="settings-button" class="settings-button" aria-label="Abrir opções" aria-haspopup="dialog" aria-expanded="false" data-modal-open="settings-modal">

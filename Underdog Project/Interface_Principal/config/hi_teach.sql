@@ -140,3 +140,33 @@ INSERT IGNORE INTO subjects (name, description) VALUES
     ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
     ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
     ('Banco de Dados', 'Modelagem e SQL.');
+
+-- Tabela das lives (aulas ao vivo). Rode no phpMyAdmin, no banco do Hi Teach.
+--
+-- room_key     : chave aleatória da sala no JaaS (gerada pelo PHP, ninguém adivinha)
+-- status       : 'live' (no ar) ou 'ended' (encerrada)
+-- last_seen_at : o navegador do professor avisa a cada 30s que a live segue no ar.
+--                Sem aviso por alguns minutos, a live some da lista (ver LIVE_STALE_SECONDS).
+-- subject      : matéria em texto livre. Se você tiver uma tabela de matérias,
+--                troque por subject_id e ajuste includes/live.php.
+
+CREATE TABLE IF NOT EXISTS live_classes (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    teacher_id   INT UNSIGNED NOT NULL,
+    title        VARCHAR(80)  NOT NULL,
+    subject      VARCHAR(60)  NOT NULL,
+    room_key     CHAR(24)     NOT NULL,
+    status       ENUM('live','ended') NOT NULL DEFAULT 'live',
+    started_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at     DATETIME     NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_live_room_key (room_key),
+    KEY idx_live_status (status, last_seen_at),
+    KEY idx_live_teacher (teacher_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- OPCIONAL: chave estrangeira. Só funciona se o tipo de users.id for IGUAL ao de teacher_id.
+-- Confira com:  SHOW COLUMNS FROM users LIKE 'id';
+-- ALTER TABLE live_classes
+--     ADD CONSTRAINT fk_live_teacher FOREIGN KEY (teacher_id) REFERENCES users (id) ON DELETE CASCADE;

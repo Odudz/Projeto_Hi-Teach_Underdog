@@ -78,8 +78,16 @@
 					.trim(),
 		},
 		"live-class.php": { label: "Aulas ao vivo", parent: "index.php" },
+		"live-watch.php": { label: "Assistindo", parent: "live-class.php" },
+		"live-teacher.php": { label: "Transmitindo", parent: "live-class.php" },
 		"messages.php": { label: "Mensagens", parent: "index.php" },
 		"profile.php": { label: "Perfil", parent: "index.php" },
+		"profile-view.php": {
+			label: "Perfil",
+			parent: "forum.php",
+			dynamicLabel: () =>
+				document.getElementById("profile-name")?.textContent.trim(),
+		},
 		"teacher-dashboard.php": { label: "Painel do professor", parent: "profile.php" },
 		"moderator-dashboard.php": { label: "Administração", parent: "profile.php" },
 	};

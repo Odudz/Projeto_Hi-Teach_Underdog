@@ -40,6 +40,9 @@ $sectionOf = [
     'classroom.php' => 'subjects.php',
     'activity.php' => 'subjects.php',
     'forum-topic.php' => 'forum.php',
+    'profile-view.php' => 'forum.php',
+    'live-watch.php' => 'live-class.php',
+    'live-teacher.php' => 'live-class.php',
 ];
 $activeFile = $sectionOf[$currentFile] ?? $currentFile;
 
@@ -84,7 +87,7 @@ if ($user) {
           <img class="header-avatar-image" src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
         <?php else: ?>
           <span class="header-avatar-initials"><?= e($headerInitials) ?></span>
-        <?php endif; ?>Add icons to navigation items in cabecalho.php
+        <?php endif; ?>
       </a>
     <?php endif; ?>
     <button type="button" id="settings-button" class="settings-button" aria-label="Abrir opções" aria-haspopup="dialog" aria-expanded="false" data-modal-open="settings-modal">

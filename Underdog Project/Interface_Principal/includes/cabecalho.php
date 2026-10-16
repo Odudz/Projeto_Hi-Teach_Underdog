@@ -7,21 +7,43 @@ $baseUrl = $baseUrl ?? '';
 $currentFile = basename($_SERVER['SCRIPT_NAME']);
 
 $navItems = [
-    ['index.php', 'Início'],
-    ['pages/subjects.php', 'Matérias'],
-    ['pages/live-class.php', 'Aulas ao vivo'],
-    ['pages/forum.php', 'Fóruns'],
-    ['pages/messages.php', 'Mensagens'],
+    ['index.php', 'Início', 'home'],
+    ['pages/subjects.php', 'Matérias', 'subjects'],
+    ['pages/live-class.php', 'Aulas ao vivo', 'live'],
+    ['pages/forum.php', 'Fóruns', 'forum'],
+    ['pages/messages.php', 'Mensagens', 'messages'],
 ];
 if ($user && $user['role'] === 'teacher') {
-    $navItems[] = ['pages/teacher-dashboard.php', 'Painel do professor'];
+    $navItems[] = ['pages/teacher-dashboard.php', 'Painel do professor', 'dashboard'];
 }
 if ($user && $user['role'] === 'admin') {
-    $navItems[] = ['pages/moderator-dashboard.php', 'Administração'];
+    $navItems[] = ['pages/moderator-dashboard.php', 'Administração', 'admin'];
 }
 if (!$user) {
-    $navItems[] = ['auth/login.php', 'Entrar'];
+    $navItems[] = ['auth/login.php', 'Entrar', 'login'];
 }
+
+// Ícones do menu (conteúdo interno de um SVG 24x24)
+$navIcons = [
+    'home' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    'subjects' => '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+    'live' => '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    'forum' => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    'messages' => '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+    'dashboard' => '<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
+    'admin' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    'login' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
+];
+
+// Páginas internas destacam no menu a seção a que pertencem
+$sectionOf = [
+    'course.php' => 'subjects.php',
+    'video.php' => 'subjects.php',
+    'classroom.php' => 'subjects.php',
+    'activity.php' => 'subjects.php',
+    'forum-topic.php' => 'forum.php',
+];
+$activeFile = $sectionOf[$currentFile] ?? $currentFile;
 
 $headerInitials = '';
 if ($user) {
@@ -52,8 +74,8 @@ if ($user) {
   <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">Hi Teach</a>
   <nav id="main-nav" class="main-nav">
     <ul class="nav-list">
-      <?php foreach ($navItems as $index => [$href, $label]): ?>
-        <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link" id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($baseUrl . $href) ?>"<?= $currentFile === basename($href) ? ' aria-current="page"' : '' ?>><?= e($label) ?></a></li>
+      <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>
+        <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link" id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($baseUrl . $href) ?>"<?= $currentFile === basename($href) ? ' aria-current="page"' : ($activeFile === basename($href) ? ' aria-current="true"' : '') ?>><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?= $navIcons[$icon] ?></svg><span><?= e($label) ?></span></a></li>
       <?php endforeach; ?>
     </ul>
   </nav>

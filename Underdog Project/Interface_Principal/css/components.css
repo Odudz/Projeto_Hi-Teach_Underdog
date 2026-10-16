@@ -416,3 +416,71 @@ textarea.form-input {
   transform-box: fill-box;
   transform-origin: center;
 }
+
+.forum-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+
+/* Elementos de autoria dos fóruns */
+.forum-author {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.forum-author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.forum-author-link:hover,
+.forum-author-link:focus-visible,
+.forum-author-name:hover,
+.forum-author-name:focus-visible {
+  text-decoration: underline;
+}
+
+.forum-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: var(--font-size-sm);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.forum-avatar-initials {
+  text-transform: uppercase;
+}
+
+.forum-message-author {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.message-author-date {
+  font-weight: 600;
+}
+
+.forum-author-name {
+  font-weight: 800;
+}
+

@@ -75,8 +75,8 @@ if ($user) {
   <a id="site-logo" class="site-logo"
    href="<?= e($baseUrl) ?>index.php">
     <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
-    <span>Hi Teach</span>
-</a>
+    <span class="site-logo-text">Hi Teach</span>
+  </a>
   <nav id="main-nav" class="main-nav">
     <ul class="nav-list">
       <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>

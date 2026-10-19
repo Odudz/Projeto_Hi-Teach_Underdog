@@ -1,6 +1,16 @@
 CREATE DATABASE IF NOT EXISTS hi_teach CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE hi_teach;
 
+/* CASO VOCE QUEIRA CRIAR UM USUÁRIO, POR UMA SENHA E DAR PERMISSÕES, COLOQUE OS VALORES DESEJADOS ABAIXO
+ 
+ CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'localhost' IDENTIFIED BY 'SENHA_DESEJADA';
+ CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'127.0.0.1' IDENTIFIED BY 'SENHA_DESEJADA';
+ GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'localhost';
+ GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'127.0.0.1';
+ FLUSH PRIVILEGES; 
+ 
+ */
+
 CREATE TABLE IF NOT EXISTS users (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(50) NOT NULL,
@@ -11,9 +21,7 @@ CREATE TABLE IF NOT EXISTS users (
     bio VARCHAR(250) DEFAULT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('student', 'teacher', 'admin') NOT NULL DEFAULT 'student',
-
     activate TINYINT(1) NOT NULL DEFAULT 1,
-
     recovery_phrase_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP NULL DEFAULT NULL,
@@ -132,11 +140,6 @@ CREATE TABLE IF NOT EXISTS forum_attachments (
     CONSTRAINT fk_attachment_post FOREIGN KEY (post_id) REFERENCES forum_posts (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO subjects (name, description) VALUES
-    ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
-    ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
-    ('Banco de Dados', 'Modelagem e SQL.');
-
 CREATE TABLE IF NOT EXISTS live_classes (
     id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
     teacher_id   INT UNSIGNED NOT NULL,
@@ -152,3 +155,40 @@ CREATE TABLE IF NOT EXISTS live_classes (
     KEY idx_live_status (status, last_seen_at),
     KEY idx_live_teacher (teacher_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @has_old := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'is_active');
+SET @sql := IF(@has_old > 0,
+    'ALTER TABLE users CHANGE is_active activate TINYINT(1) NOT NULL DEFAULT 1',
+    'SELECT ''activate: nada a fazer (coluna is_active nao existe)''');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+SET @has_hash := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'recovery_phrase_hash');
+SET @sql := IF(@has_hash = 0,
+    'ALTER TABLE users ADD COLUMN recovery_phrase_hash VARCHAR(255) DEFAULT NULL AFTER activate',
+    'SELECT ''recovery_phrase_hash: ja existe''');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+ALTER TABLE teacher_profiles MODIFY specializations TEXT NOT NULL;
+
+INSERT INTO teacher_proofs (user_id, file_name, original_name)
+SELECT tp.user_id, tp.proof_path, tp.proof_path
+FROM teacher_profiles tp
+WHERE NOT EXISTS (SELECT 1 FROM teacher_proofs p WHERE p.user_id = tp.user_id);
+
+UPDATE student_profiles
+SET enrollment_number = CAST(user_id AS CHAR)
+WHERE enrollment_number IS NULL OR enrollment_number = '';
+
+SET @has_edited := (SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'forum_posts' AND COLUMN_NAME = 'edited_at');
+SET @sql := IF(@has_edited = 0,
+    'ALTER TABLE forum_posts ADD COLUMN edited_at TIMESTAMP NULL DEFAULT NULL AFTER created_at',
+    'SELECT ''edited_at: ja existe''');
+PREPARE step FROM @sql; EXECUTE step; DEALLOCATE PREPARE step;
+
+INSERT IGNORE INTO subjects (name, description) VALUES
+    ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
+    ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
+    ('Banco de Dados', 'Modelagem e SQL.');

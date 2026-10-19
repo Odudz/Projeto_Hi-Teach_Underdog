@@ -1,0 +1,210 @@
+/* Biografia: caixa fixa, sem redimensionar */
+textarea.form-textarea-fixed {
+  height: 140px;
+  min-height: 0;
+  resize: none;
+  overflow-y: auto;
+}
+
+/* Contadores e dicas */
+.field-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.field-counter {
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  transition: transform var(--duration-base) var(--ease-bounce);
+}
+.field-counter.is-limit {
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* Especializações (badges) */
+.tag-list:empty {
+  display: none;
+}
+.tag-list .tag {
+  padding-right: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+.tag.is-new {
+  animation: tag-pop var(--duration-base) var(--ease-bounce) both;
+}
+.tag.is-leaving {
+  animation: tag-out 180ms var(--ease-in-out) both;
+}
+.tag-remove,
+.file-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform var(--duration-base) var(--ease-bounce),
+    background-color var(--duration-base) var(--ease-out);
+}
+.tag-remove:hover,
+.file-remove:hover {
+  background: var(--color-secondary);
+  transform: rotate(90deg);
+}
+.tag-remove:active,
+.file-remove:active {
+  transform: scale(0.88);
+}
+.tag-entry {
+  display: flex;
+  gap: var(--space-2);
+}
+.tag-entry .form-input {
+  flex: 1;
+  min-width: 0;
+}
+.tag-add {
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Comprovantes */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+  background: var(--color-background);
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) ease;
+}
+.dropzone:hover,
+.dropzone:focus-within,
+.dropzone.is-over {
+  background: var(--color-secondary);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+.dropzone:focus {
+  outline: none;
+}
+.dropzone.is-over {
+  border-style: solid;
+}
+.dropzone[aria-invalid="true"] {
+  border-color: var(--color-danger);
+  box-shadow: 3px 3px 0 var(--color-danger);
+}
+.dropzone-icon {
+  color: var(--color-primary);
+  pointer-events: none;
+}
+.dropzone p {
+  margin: 0;
+  pointer-events: none;
+}
+.dropzone-title {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+}
+.dropzone .button {
+  margin-top: var(--space-2);
+}
+.dropzone + .file-list,
+.dropzone + input + .file-list {
+  margin-top: var(--space-3);
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.file-list:empty {
+  display: none;
+}
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.file-item.is-new {
+  animation: tag-pop var(--duration-base) var(--ease-bounce) both;
+}
+.file-item.is-leaving {
+  animation: tag-out 180ms var(--ease-in-out) both;
+}
+.file-icon {
+  display: grid;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-size {
+  flex-shrink: 0;
+  font-size: var(--font-size-sm);
+  opacity: 0.75;
+}
+
+@keyframes tag-pop {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes tag-out {
+  to {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@media (max-width: 640px) {
+  .tag-entry {
+    flex-direction: column;
+  }
+  .tag-add {
+    align-self: flex-start;
+  }
+  .file-size {
+    display: none;
+  }
+}

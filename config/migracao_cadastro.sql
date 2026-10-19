@@ -1,0 +1,3 @@
+-- Este arquivo foi unido ao migracao_recuperacao.sql (que agora faz tudo: activate,
+-- frase recuperadora, especializações em lista e vários comprovantes).
+-- Rode somente o config/migracao_recuperacao.sql.

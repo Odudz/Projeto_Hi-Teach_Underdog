@@ -72,7 +72,11 @@ if ($user) {
 </head>
 <body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"<?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
 <header id="site-header" class="site-header">
-  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">Hi Teach</a>
+  <a id="site-logo" class="site-logo"
+   href="<?= e($baseUrl) ?>index.php">
+    <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
+    <span class="site-logo-text">Hi Teach</span>
+  </a>
   <nav id="main-nav" class="main-nav">
     <ul class="nav-list">
       <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>

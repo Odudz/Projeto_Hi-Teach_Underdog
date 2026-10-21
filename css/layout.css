@@ -14,27 +14,11 @@
 }
 .site-logo {
   order: 1;
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--font-size-sm);
+  display: inline-block;
+  font-size: var(--font-size-xl);
   font-weight: 800;
   text-decoration: none;
   transition: transform var(--duration-base) var(--ease-bounce);
-}
-
-.site-logo svg {
-  display: block;
-  width: 38px;
-  height: 32px;
-  flex-shrink: 0;
-  color: inherit;
-}
-
-.site-logo-text {
-  font-size: 1em;
-  line-height: 1;
 }
 .site-logo:hover {
   transform: rotate(-3deg) scale(1.06);
@@ -238,5 +222,81 @@
   }
   .hero {
     padding: var(--space-4) var(--space-3);
+  }
+}
+
+/* Ícone de chat ao lado do perfil, com balão vermelho de novidades */
+.header-chat {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  color: var(--color-header-text);
+  border: 2px solid var(--color-header-text);
+  border-radius: 50%;
+  text-decoration: none;
+  transition:
+    transform 500ms var(--ease-bounce),
+    background-color var(--duration-base) var(--ease-out),
+    color var(--duration-base) var(--ease-out);
+}
+.header-chat:hover,
+.header-chat:focus-visible,
+.header-chat[aria-current="page"] {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.header-chat:hover,
+.header-chat:focus-visible {
+  transform: translateY(-2px) scale(1.08);
+}
+.header-chat:focus-visible {
+  outline: 2px solid var(--color-header-text);
+  outline-offset: 3px;
+}
+.header-chat:active {
+  transform: scale(0.9);
+}
+.header-chat-badge {
+  position: absolute;
+  top: -9px;
+  right: -11px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+  border: 2px solid var(--color-header);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+.header-chat-badge[hidden] {
+  display: none;
+}
+.header-chat-badge.is-bumped {
+  animation: header-badge-pop 400ms var(--ease-bounce);
+}
+@keyframes header-badge-pop {
+  0% {
+    scale: 1;
+  }
+  45% {
+    scale: 1.45;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .header-chat-badge.is-bumped {
+    animation: none;
   }
 }

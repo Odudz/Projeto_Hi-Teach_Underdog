@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/recovery.php';
+require_once __DIR__ . '/../includes/social.php';
 
 if (!$user) {
     $gate = 'login';
@@ -228,8 +229,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind !== 'delete-account') {
 
 $pageId = 'profile';
 $pageTitle = 'Perfil';
-$extraCss = ['profile', 'image-editor'];
-$extraJs = ['image-editor'];
+$extraCss = ['profile', 'image-editor', 'social'];
+$extraJs = ['image-editor', 'forum'];
 $baseUrl = '../';
 
 $roleLabels = ['student' => 'Aluno', 'teacher' => 'Professor', 'admin' => 'Administrador'];
@@ -245,6 +246,13 @@ if ($user['role'] === 'student' && $teacherStatus === 'pending') {
 }
 
 $initials = mb_strtoupper(implode('', array_map(fn ($part) => mb_substr($part, 0, 1), array_slice(preg_split('/\s+/', trim($user['name'])) ?: [], 0, 2))));
+
+socialEnsureSchema($pdo);
+$socialCounts = socialBadgeCounts($pdo, (int) $user['id']);
+$friendsTotal = socialCountFriends($pdo, (int) $user['id']);
+$stmt = $pdo->prepare('SELECT COUNT(*) FROM forum_posts WHERE user_id = ?');
+$stmt->execute([$user['id']]);
+$forumPostsCount = (int) $stmt->fetchColumn();
 $memberSince = date('d/m/Y', strtotime($user['created_at']));
 
 ob_start();
@@ -705,7 +713,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       <span class="stat-label">Aulas assistidas</span>
     </div>
     <div class="stat-card">
-      <span id="stat-posts" class="stat-value">0</span>
+      <span id="stat-posts" class="stat-value"><?= $forumPostsCount ?></span>
       <span class="stat-label">Mensagens em fóruns</span>
     </div>
   </section>
@@ -713,6 +721,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
   <section id="profile-about" class="section">
     <h2 class="section-title">Sobre</h2>
     <dl id="profile-data" class="profile-data">
+      <dt>Código</dt>
+      <dd id="profile-id"><?= e(socialTag($user)) ?></dd>
       <dt>E-mail</dt>
       <dd id="profile-email"><?= e($user['email']) ?></dd>
       <dt>Telefone</dt>
@@ -720,6 +730,20 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       <dt>Membro desde</dt>
       <dd id="profile-member-since"><?= e($memberSince) ?></dd>
     </dl>
+  </section>
+
+  <section id="profile-contacts" class="section">
+    <h2 class="section-title">Contatos</h2>
+    <div class="friend-card">
+      <div class="friend-card-text">
+        <h3 class="friend-card-title">Amigos, conversas e pedidos em um só lugar</h3>
+        <p class="form-note">Seu código para ser encontrado: <strong><?= e(socialTag($user)) ?></strong></p>
+        <p class="form-note"><?= $friendsTotal ?> <?= $friendsTotal === 1 ? 'amigo' : 'amigos' ?><?= $socialCounts['requests'] > 0 ? ' · ' . $socialCounts['requests'] . ' ' . ($socialCounts['requests'] === 1 ? 'pedido esperando' : 'pedidos esperando') : '' ?><?= $socialCounts['messages'] > 0 ? ' · ' . $socialCounts['messages'] . ' ' . ($socialCounts['messages'] === 1 ? 'mensagem não lida' : 'mensagens não lidas') : '' ?></p>
+      </div>
+      <div class="friend-card-actions">
+        <a class="button button-primary" href="contacts.php">Abrir contatos</a>
+      </div>
+    </div>
   </section>
 
   <section id="profile-badges" class="section">

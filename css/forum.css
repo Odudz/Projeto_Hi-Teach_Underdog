@@ -756,7 +756,7 @@ textarea.chat-input.write-area:focus {
 }
 .forum-new-body {
   min-height: 130px;
-  resize: vertical;
+  resize: none !important;
 }
 
 .forum-toolbar {

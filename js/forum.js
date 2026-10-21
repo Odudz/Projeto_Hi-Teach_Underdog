@@ -166,6 +166,8 @@
 			'<div class="confirm-body"><p id="chat-confirm-text" class="confirm-text"></p>' +
 			'<div class="confirm-actions"><button type="button" class="button" data-modal-close>Cancelar</button>' +
 			'<button type="button" class="button button-delete" data-chat-confirm-yes>Sim, excluir</button></div></div></section>';
+		confirmOverlay.querySelector("#chat-confirm-title").dataset.default = "Confirmar exclusão";
+		confirmOverlay.querySelector("[data-chat-confirm-yes]").dataset.default = "Sim, excluir";
 		document.body.append(confirmOverlay);
 
 		confirmOpener = document.createElement("button");
@@ -188,9 +190,13 @@
 		}).observe(confirmOverlay, { attributes: true, attributeFilter: ["class"] });
 	};
 
-	const askConfirm = (message) =>
+	const askConfirm = (message, labels = {}) =>
 		new Promise((resolve) => {
 			if (!confirmOverlay) buildConfirm();
+			const titleEl = confirmOverlay.querySelector("#chat-confirm-title");
+			const yesEl = confirmOverlay.querySelector("[data-chat-confirm-yes]");
+			titleEl.textContent = labels.title || titleEl.dataset.default;
+			yesEl.textContent = labels.yes || yesEl.dataset.default;
 			confirmOverlay.querySelector("#chat-confirm-text").textContent = message;
 			confirmResolve = resolve;
 			confirmOpener.click();
@@ -203,7 +209,11 @@
 		const message = submitter?.dataset.confirm || form.dataset.confirm;
 		if (!message) return;
 		event.preventDefault();
-		if (await askConfirm(message)) {
+		const labels = {
+			title: submitter?.dataset.confirmTitle || form.dataset.confirmTitle,
+			yes: submitter?.dataset.confirmYes || form.dataset.confirmYes,
+		};
+		if (await askConfirm(message, labels)) {
 			form.dataset.confirmed = "1";
 			form.requestSubmit(submitter || undefined);
 		}

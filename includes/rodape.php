@@ -60,6 +60,9 @@
 <?php $baseUrl = $baseUrl ?? ''; ?>
 <script src="<?= e($baseUrl) ?>js/modal.js"></script>
 <script src="<?= e($baseUrl) ?>js/settings.js"></script>
+<?php if (!empty($user)): ?>
+<script src="<?= e($baseUrl) ?>js/social.js"></script>
+<?php endif; ?>
 <?php foreach ($extraJs ?? [] as $script): ?>
 <script src="<?= e($baseUrl) ?>js/<?= e($script) ?>.js"></script>
 <?php endforeach; ?>

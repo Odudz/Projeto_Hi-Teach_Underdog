@@ -2,7 +2,7 @@
 	const LEAVE_MS = 650;
 	const REVEAL_START_MS = 450;
 	const REVEAL_SELECTOR =
-		".hero > *, .section-title, .card, .form, .table, .video-player, .live-player, .profile-data, .comment-item, .message-item, .live-item, .material-item, .stat-card, .badge-item, .profile-header, .gate";
+		".hero > *, .section-title, .card, .form, .table, .video-player, .live-player, .profile-data, .comment-item, .message-item, .live-item, .material-item, .stat-card, .badge-item, .profile-header, .contact-hero, .gate";
 	const root = document.documentElement;
 	const body = document.body;
 	const isReduced = () =>
@@ -80,7 +80,7 @@
 		"live-class.php": { label: "Aulas ao vivo", parent: "index.php" },
 		"live-watch.php": { label: "Assistindo", parent: "live-class.php" },
 		"live-teacher.php": { label: "Transmitindo", parent: "live-class.php" },
-		"messages.php": { label: "Mensagens", parent: "index.php" },
+		"contacts.php": { label: "Contatos", parent: "index.php" },
 		"profile.php": { label: "Perfil", parent: "index.php" },
 		"profile-view.php": {
 			label: "Perfil",

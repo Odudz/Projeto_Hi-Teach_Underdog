@@ -6,6 +6,24 @@ ini_set('log_errors', '1');
 
 date_default_timezone_set('America/Sao_Paulo');
 
+// Emojis têm 4 bytes em UTF-8. Sem isto, algumas hospedagens entregam a página
+// como ISO-8859-1 ou gravam no banco como utf8 de 3 bytes, e todo emoji vira "?".
+mb_internal_encoding('UTF-8');
+ini_set('default_charset', 'UTF-8');
+if (!headers_sent()) {
+    header('Content-Type: text/html; charset=UTF-8');
+}
+
+/* CASO VOCE QUEIRA CRIAR UM USUÁRIO, POR UMA SENHA E DAR PERMISSÕES, COLOQUE OS VALORES DESEJADOS ABAIXO
+ 
+ CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'localhost' IDENTIFIED BY 'SENHA_DESEJADA';
+ CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'127.0.0.1' IDENTIFIED BY 'SENHA_DESEJADA';
+ GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'localhost';
+ GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'127.0.0.1';
+ FLUSH PRIVILEGES; 
+ 
+ */
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
     session_set_cookie_params([
@@ -30,6 +48,8 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
+        // Alguns servidores ignoram o charset do DSN; este comando força a conexão inteira em utf8mb4.
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
     ]);
 } catch (PDOException $error) {
     error_log('conexao.php: ' . $error->getMessage());

@@ -2,16 +2,15 @@
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/forum-upload.php';
 
-const CHAT_MESSAGE_MAX = 280;
-const CHAT_MESSAGE_MAX_LINES = 5;
-const CHAT_EDIT_SECONDS = 180;
-const CHAT_DELETE_SECONDS = 300;
+require_once __DIR__ . '/../includes/chat-rules.php';
+require_once __DIR__ . '/../includes/forum-rules.php';
 
 $topicId = (int) ($_GET['id'] ?? 0);
 
 $stmt = $pdo->prepare(
     'SELECT t.id, t.title, t.body, t.is_closed, t.created_at, s.name AS subject,
-            u.id AS author_id, u.name AS author, u.avatar_mime AS author_avatar_mime
+            u.id AS author_id, u.name AS author, u.avatar_mime AS author_avatar_mime,
+            TIMESTAMPDIFF(SECOND, GREATEST(t.created_at, COALESCE((SELECT MAX(p.created_at) FROM forum_posts p WHERE p.topic_id = t.id), t.created_at)), NOW()) AS idle
      FROM forum_topics t
      JOIN subjects s ON s.id = t.subject_id
      JOIN users u ON u.id = t.user_id AND u.activate = 1
@@ -21,7 +20,7 @@ $stmt->execute([$topicId]);
 $topic = $stmt->fetch();
 
 if (!$topic) {
-    setFlash('error', 'Tópico não encontrado.');
+    setFlash('error', 'Fórum não encontrado.');
     redirect('forum.php');
 }
 
@@ -29,58 +28,8 @@ $self = 'forum-topic.php?id=' . $topicId;
 $replyText = '';
 $canModerate = $user && in_array($user['role'], ['admin', 'teacher'], true);
 $canUploadForumFiles = $user && in_array($user['role'], ['admin', 'teacher'], true);
-
-function chatJson(int $status, array $payload): never
-{
-    http_response_code($status);
-    header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-function chatNormalize(string $text): string
-{
-    $text = str_replace(["\r\n", "\r"], "\n", $text);
-    $text = preg_replace('/[\x{200B}-\x{200F}\x{2028}-\x{202E}\x{2060}-\x{2064}\x{2800}\x{3164}\x{115F}\x{1160}\x{FEFF}\x{00AD}]/u', '', $text) ?? $text;
-    $text = preg_replace('/[^\S\n]+/u', ' ', $text) ?? $text;
-    $text = preg_replace('/ ?\n ?/', "\n", $text) ?? $text;
-    $text = preg_replace('/\n{2,}/', "\n", $text) ?? $text;
-    return trim($text);
-}
-
-function chatContainsLink(string $text): bool
-{
-    $flat = mb_strtolower(preg_replace('/[\s\x{200B}-\x{200F}]+/u', '', $text) ?? $text);
-    if (preg_match('~(https?:|ftp:|www\.|://|mailto:|wa\.me|bit\.ly|t\.me|discord\.gg|tinyurl)~u', $flat)) {
-        return true;
-    }
-    if (preg_match('~[a-z0-9._%+\-]+@[a-z0-9\-]+\.[a-z]{2,}~u', $flat)) {
-        return true;
-    }
-    if (preg_match('~[a-z0-9\-]+\.(?:com|net|org|info|biz|xyz|site|online|shop|store|click|vip|icu|br|ru|cn)(?![a-z0-9])~u', $flat)) {
-        return true;
-    }
-    $dotted = mb_strtolower(preg_replace('/\s*(\[\s*(dot|ponto)\s*\]|\(\s*(dot|ponto)\s*\))\s*/iu', '.', $text) ?? $text);
-    return (bool) preg_match('~[a-z0-9\-]+\.(?:com|net|org|info|biz|xyz|top|site|online|club|shop|store|link|click|live|app|dev|io|ly|me|co|tv|cc|gg|gl|ws|vip|icu|cyou|ru|cn|tk|ml|ga|cf|gq|pw|br|pt|uk|fr)(?![a-z0-9])~iu', $dotted);
-}
-
-function chatValidate(string $text): ?string
-{
-    $length = mb_strlen($text);
-    if ($length === 0) {
-        return 'A mensagem não pode ficar vazia.';
-    }
-    if ($length > CHAT_MESSAGE_MAX) {
-        return 'A mensagem pode ter no máximo ' . CHAT_MESSAGE_MAX . " caracteres (você digitou $length).";
-    }
-    if (substr_count($text, "\n") + 1 > CHAT_MESSAGE_MAX_LINES) {
-        return 'A mensagem pode ter no máximo ' . CHAT_MESSAGE_MAX_LINES . ' linhas.';
-    }
-    if (chatContainsLink($text)) {
-        return 'Links e endereços de sites não são permitidos nas mensagens.';
-    }
-    return null;
-}
+$isOwner = $user && (int) $user['id'] === (int) $topic['author_id'];
+$canManage = $isOwner || $canModerate;
 
 function chatFindPost(PDO $pdo, int $postId, int $topicId): ?array
 {
@@ -117,6 +66,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     requireCsrf($self, $isFetch);
 
+    if ($action === 'edit_topic') {
+        $newTitle = forumCleanTitle((string) ($_POST['title'] ?? ''));
+        $newBody = forumCleanBody((string) ($_POST['body'] ?? ''));
+        $editError = null;
+        $editStatus = 422;
+
+        if (!$isOwner) {
+            $editError = 'Só quem abriu o fórum pode editá-lo.';
+            $editStatus = 403;
+        } else {
+            $editError = forumValidate($newTitle, $newBody);
+        }
+
+        if ($editError === null) {
+            $pdo->prepare('UPDATE forum_topics SET title = ?, body = ? WHERE id = ?')->execute([$newTitle, $newBody, $topicId]);
+            if ($isFetch) {
+                chatJson(200, ['ok' => true, 'title' => $newTitle, 'body' => $newBody]);
+            }
+            setFlash('success', 'Fórum atualizado.');
+            redirect($self);
+        }
+        if ($isFetch) {
+            chatJson($editStatus, ['ok' => false, 'error' => $editError]);
+        }
+        setFlash('error', $editError);
+        redirect($self);
+    }
+
     if ($action === 'edit_post') {
         $postId = (int) ($_POST['post_id'] ?? 0);
         $newBody = chatNormalize((string) ($_POST['body'] ?? ''));
@@ -129,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             chatJson(403, ['ok' => false, 'error' => 'Você só pode editar as suas próprias mensagens.']);
         }
         if ($topic['is_closed']) {
-            chatJson(403, ['ok' => false, 'error' => 'Este tópico está fechado, então as mensagens não podem mais ser editadas.']);
+            chatJson(403, ['ok' => false, 'error' => 'Este fórum está fechado, então as mensagens não podem mais ser editadas.']);
         }
         if ((int) $post['age'] > CHAT_EDIT_SECONDS) {
             chatJson(403, ['ok' => false, 'error' => 'O prazo de ' . (CHAT_EDIT_SECONDS / 60) . ' minutos para editar essa mensagem já acabou.']);
@@ -152,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $replyStatus = 422;
 
         if ($topic['is_closed']) {
-            $replyError = 'Este tópico está fechado para novas respostas.';
+            $replyError = 'Este fórum está fechado para novas respostas.';
             $replyStatus = 403;
         } else {
             $replyError = chatValidate($replyText);
@@ -207,9 +184,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             chatJson($replyStatus, ['ok' => false, 'error' => $replyError]);
         }
         setFlash('error', $replyError);
-    } elseif ($canModerate && $action === 'toggle_close') {
+    } elseif ($canManage && $action === 'toggle_close') {
         $pdo->prepare('UPDATE forum_topics SET is_closed = 1 - is_closed WHERE id = ?')->execute([$topicId]);
-        setFlash('success', $topic['is_closed'] ? 'Tópico reaberto.' : 'Tópico fechado.');
+        setFlash('success', $topic['is_closed'] ? 'Fórum reaberto.' : 'Fórum fechado.');
         redirect($self);
     } elseif ($action === 'delete_post') {
         $postId = (int) ($_POST['post_id'] ?? 0);
@@ -267,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('error', $deleteError);
         }
         redirect($self . '#topic-messages');
-    } elseif ($canModerate && $action === 'delete_topic') {
+    } elseif ($canManage && $action === 'delete_topic') {
         try {
             $pdo->beginTransaction();
             $stmtStored = $pdo->prepare('SELECT stored_name FROM forum_attachments WHERE topic_id = ?');
@@ -282,13 +259,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $pdo->commit();
             forumCleanupFiles($storedNames);
-            setFlash('success', 'Tópico excluído.');
+            setFlash('success', 'Fórum excluído.');
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             error_log('forum-topic.php:delete_topic_failed: ' . $e->getMessage());
-            setFlash('error', 'Não foi possível excluir o tópico.');
+            setFlash('error', 'Não foi possível excluir o fórum.');
             redirect($self);
         }
         redirect('forum.php');
@@ -296,6 +273,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('error', 'Solicitação inválida.');
         redirect($self);
     }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['poll'])) {
+    $after = max(0, (int) ($_GET['after'] ?? 0));
+    $stmt = $pdo->prepare(
+        'SELECT p.id, p.body, p.created_at, p.edited_at, p.user_id,
+                TIMESTAMPDIFF(SECOND, p.created_at, NOW()) AS age,
+                u.id AS author_id, u.name AS author, u.avatar_mime AS author_avatar_mime
+         FROM forum_posts p
+         JOIN users u ON u.id = p.user_id AND u.activate = 1
+         WHERE p.topic_id = ? AND p.id > ?
+         ORDER BY p.id LIMIT 50'
+    );
+    $stmt->execute([$topicId, $after]);
+    $fresh = $stmt->fetchAll();
+
+    $freshFiles = [];
+    if ($fresh) {
+        $marks = implode(',', array_fill(0, count($fresh), '?'));
+        $stmt = $pdo->prepare("SELECT id, post_id, original_name, mime_type, file_size FROM forum_attachments WHERE post_id IN ($marks) ORDER BY id");
+        $stmt->execute(array_map(fn ($row) => (int) $row['id'], $fresh));
+        foreach ($stmt->fetchAll() as $file) {
+            $freshFiles[(int) $file['post_id']][] = $file;
+        }
+    }
+
+    $html = '';
+    $last = $after;
+    foreach ($fresh as $row) {
+        $html .= chatRenderMessage($row, $freshFiles[(int) $row['id']] ?? [], $user, (bool) $canModerate, (bool) $topic['is_closed'], $self);
+        $last = max($last, (int) $row['id']);
+    }
+
+    $stmt = $pdo->prepare('SELECT COUNT(*) AS replies, COUNT(DISTINCT user_id) AS people FROM forum_posts WHERE topic_id = ?');
+    $stmt->execute([$topicId]);
+    $totals = $stmt->fetch();
+    $stmt = $pdo->prepare('SELECT COUNT(DISTINCT user_id) FROM forum_posts WHERE topic_id = ? AND user_id <> ?');
+    $stmt->execute([$topicId, (int) $topic['author_id']]);
+
+    chatJson(200, [
+        'ok' => true,
+        'html' => $html,
+        'last_id' => $last,
+        'replies' => (int) $totals['replies'],
+        'people' => 1 + (int) $stmt->fetchColumn(),
+        'closed' => (bool) $topic['is_closed'],
+    ]);
 }
 
 $stmt = $pdo->prepare(
@@ -403,17 +427,23 @@ function chatRenderMessage(array $post, array $attachments, ?array $viewer, bool
     return (string) ob_get_clean();
 }
 
-$participants = array_unique(array_merge([(int) $topic['author_id']], array_map('intval', array_column($posts, 'user_id'))));
+$participants = [(int) $topic['author_id'] => $topic];
+foreach ($posts as $post) {
+    $participants[(int) $post['user_id']] ??= $post;
+}
+$participantCount = count($participants);
+$stack = array_slice(array_values($participants), 0, 5);
+$descLong = mb_strlen($topic['body']) > 220 || substr_count($topic['body'], "\n") > 3;
 
 $pageId = 'forum-topic';
 $pageTitle = $topic['title'];
 $extraCss = ['forum'];
-$extraJs = ['forum'];
+$extraJs = ['forum', 'forum-topic'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
-  <section id="topic-header" class="section forum-hero<?= $topic['is_closed'] ? ' is-closed' : '' ?>">
+  <section id="topic-header" class="section forum-hero topic-hero<?= $topic['is_closed'] ? ' is-closed' : '' ?>" data-closed="<?= $topic['is_closed'] ? '1' : '0' ?>">
     <span class="forum-hero-deco forum-hero-deco-a" aria-hidden="true"></span>
     <span class="forum-hero-deco forum-hero-deco-b" aria-hidden="true"></span>
     <span class="forum-hero-deco forum-hero-deco-c" aria-hidden="true"></span>
@@ -427,30 +457,80 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       <span class="forum-chip forum-chip-status"><?= $topic['is_closed'] ? 'Fechado' : 'Aberto' ?></span>
     </nav>
 
-    <h2 class="forum-hero-title"><?= e($topic['title']) ?><?= $topic['is_closed'] ? ' 🔒' : '' ?></h2>
+    <div id="topic-view" class="topic-view">
+      <h1 class="forum-hero-title" data-topic-title><?= e($topic['title']) ?></h1>
+      <p class="topic-desc<?= $descLong ? ' is-clamped' : '' ?>" data-topic-desc><?= e($topic['body']) ?></p>
+      <?php if ($descLong): ?>
+        <button type="button" class="topic-more" data-topic-more aria-expanded="false">Ver tudo</button>
+      <?php endif; ?>
+      <?php if ($topicAttachments): ?>
+        <?= chatAttachments($topicAttachments) ?>
+      <?php endif; ?>
+    </div>
 
-    <p id="topic-info" class="topic-info forum-hero-by">
-      <?= chatAvatar($topic, $user) ?>
-      <span>
-        Criado por
-        <a class="forum-author-name" href="profile-view.php?id=<?= (int) $topic['author_id'] ?>"><?= e($topic['author']) ?></a>
-        <time datetime="<?= e(date('c', strtotime($topic['created_at']))) ?>">em <?= e(date('d/m/Y H:i', strtotime($topic['created_at']))) ?></time>
-      </span>
-    </p>
+    <?php if ($isOwner): ?>
+      <form id="topic-edit" class="topic-edit" action="<?= e($self) ?>" method="post" hidden>
+        <?= csrfInput() ?>
+        <input type="hidden" name="action" value="edit_topic">
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="edit-title">Título</label>
+            <small class="field-counter" data-count="title" data-max="<?= FORUM_TITLE_MAX ?>">0/<?= FORUM_TITLE_MAX ?></small>
+          </div>
+          <input type="text" id="edit-title" name="title" class="form-input" maxlength="<?= FORUM_TITLE_MAX ?>" value="<?= e($topic['title']) ?>" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label" for="edit-body">Descrição</label>
+            <small class="field-counter" data-count="body" data-max="<?= FORUM_BODY_MAX ?>">0/<?= FORUM_BODY_MAX ?></small>
+          </div>
+          <textarea id="edit-body" name="body" class="form-input forum-new-body" rows="5" maxlength="<?= FORUM_BODY_MAX ?>" required><?= e($topic['body']) ?></textarea>
+        </div>
+        <p class="chat-edit-error" role="alert" data-edit-error hidden></p>
+        <div class="topic-edit-bar">
+          <button type="button" class="button button-small" data-edit-cancel>Cancelar</button>
+          <button type="submit" class="button button-primary button-small" data-edit-save>Salvar</button>
+        </div>
+      </form>
+    <?php endif; ?>
 
-    <ul class="forum-stats" aria-label="Resumo do tópico">
-      <li class="forum-stat"><strong data-stat-replies><?= count($posts) ?></strong><span>respostas</span></li>
-      <li class="forum-stat"><strong><?= count($participants) ?></strong><span>participantes</span></li>
-    </ul>
+    <div class="topic-meta">
+      <p id="topic-info" class="topic-info forum-hero-by">
+        <?= chatAvatar($topic, $user) ?>
+        <span>
+          <a class="forum-author-name" href="profile-view.php?id=<?= (int) $topic['author_id'] ?>"><?= e($topic['author']) ?></a>
+          <time datetime="<?= e(date('c', strtotime($topic['created_at']))) ?>"><?= e(date('d/m/Y H:i', strtotime($topic['created_at']))) ?></time>
+        </span>
+      </p>
 
-    <?php if ($canModerate): ?>
+      <ul class="topic-people" aria-label="Participantes">
+        <?php foreach ($stack as $person): ?>
+          <li><?= chatAvatar($person, $user) ?></li>
+        <?php endforeach; ?>
+        <?php if ($participantCount > count($stack)): ?>
+          <li class="topic-people-more">+<?= $participantCount - count($stack) ?></li>
+        <?php endif; ?>
+      </ul>
+
+      <ul class="forum-stats" aria-label="Resumo do fórum">
+        <li class="forum-stat"><strong data-stat-replies><?= count($posts) ?></strong><span>respostas</span></li>
+        <li class="forum-stat"><strong data-stat-people><?= $participantCount ?></strong><span>participantes</span></li>
+        <li class="forum-stat"><span>Atividade <?= e(forumAgo((int) $topic['idle'])) ?></span></li>
+      </ul>
+    </div>
+
+    <?php if ($canManage): ?>
       <form id="topic-moderation" class="inline-form forum-hero-tools" action="<?= e($self) ?>" method="post">
         <?= csrfInput() ?>
+        <?php if ($isOwner): ?>
+          <button type="button" class="button button-secondary" data-edit-open>Editar</button>
+        <?php endif; ?>
         <button type="submit" name="action" value="toggle_close" class="button button-secondary">
-          <?= $topic['is_closed'] ? 'Reabrir tópico' : 'Fechar tópico' ?>
+          <?= $topic['is_closed'] ? 'Destrancar' : 'Trancar' ?>
         </button>
         <button type="submit" name="action" value="delete_topic" class="button button-danger"
-                data-confirm="Excluir este tópico e todas as mensagens?">Excluir tópico</button>
+                data-confirm="Excluir este fórum e as <?= count($posts) ?> mensagens? Não dá para voltar atrás."
+                data-confirm-title="Excluir fórum" data-confirm-yes="Sim, excluir">Excluir</button>
       </form>
     <?php endif; ?>
   </section>
@@ -464,19 +544,11 @@ include_once __DIR__ . '/../includes/cabecalho.php';
       data-csrf="<?= e(csrfToken()) ?>"
       data-limit="<?= CHAT_MESSAGE_MAX ?>"
       data-max-lines="<?= CHAT_MESSAGE_MAX_LINES ?>"
+      data-topic-poll="<?= e($self) ?>&amp;poll=1"
     >
-      <li class="chat-message<?= $user && (int) $user['id'] === (int) $topic['author_id'] ? ' is-own' : '' ?>">
-        <?= chatAvatar($topic, $user) ?>
-        <div class="chat-bubble">
-          <div class="chat-meta">
-            <a class="chat-author" href="profile-view.php?id=<?= (int) $topic['author_id'] ?>"><?= e($topic['author']) ?></a>
-            <span class="chat-badge">autor do tópico</span>
-          </div>
-          <p class="chat-text"><?= e($topic['body']) ?></p>
-          <?= chatAttachments($topicAttachments) ?>
-        </div>
-      </li>
-
+      <?php if (!$posts): ?>
+        <li class="dm-start" data-topic-empty>Ainda não há mensagens.</li>
+      <?php endif; ?>
       <?php foreach ($posts as $post): ?>
         <?= chatRenderMessage($post, $postAttachments[(int) $post['id']] ?? [], $user, (bool) $canModerate, (bool) $topic['is_closed'], $self) ?>
       <?php endforeach; ?>
@@ -484,49 +556,40 @@ include_once __DIR__ . '/../includes/cabecalho.php';
   </section>
 
   <section id="topic-reply" class="section">
-    <h2 class="section-title">Responder</h2>
-
     <?php if ($topic['is_closed']): ?>
-      <p class="form-note">Este tópico está fechado para novas respostas.</p>
+      <div class="write-locked"><p>Este fórum está fechado.</p></div>
     <?php elseif (!$user): ?>
-      <p class="form-note">
-        <a class="card-link" href="../auth/login.php?next=pages/forum-topic.php">Entre na sua conta</a> para responder.
-      </p>
+      <div class="write-locked">
+        <p><a class="card-link" href="../auth/login.php?next=pages/forum-topic.php%3Fid%3D<?= $topicId ?>">Entre na sua conta</a> para responder.</p>
+      </div>
     <?php else: ?>
-      <form id="reply-form" class="form" action="<?= e($self) ?>" method="post" enctype="multipart/form-data">
+      <form id="reply-form" class="form write-sheet" action="<?= e($self) ?>" method="post" enctype="multipart/form-data">
         <?= csrfInput() ?>
         <input type="hidden" name="action" value="reply">
-        <div class="form-group">
-          <label class="form-label" for="reply-text">Mensagem</label>
-          <textarea
-            id="reply-text"
-            name="body"
-            class="form-input chat-input"
-            rows="3"
-            data-chat-limit="<?= CHAT_MESSAGE_MAX ?>"
-            data-chat-lines="<?= CHAT_MESSAGE_MAX_LINES ?>"
-            aria-describedby="reply-counter reply-rules"
-            required
-          ><?= e($replyText) ?></textarea>
-          <p id="reply-error" class="chat-edit-error" role="alert" hidden></p>
-          <div class="chat-tools">
-            <div class="emoji-wrap">
-              <button type="button" class="emoji-toggle" data-emoji-target="reply-text" aria-label="Inserir emoji" aria-haspopup="true" aria-expanded="false">😊</button>
-            </div>
-            <small id="reply-counter" class="field-counter" aria-live="polite">0/<?= CHAT_MESSAGE_MAX ?></small>
-          </div>
-          <small id="reply-rules" class="form-note">Até <?= CHAT_MESSAGE_MAX ?> caracteres e <?= CHAT_MESSAGE_MAX_LINES ?> linhas. Links não são permitidos.</small>
-        </div>
+        <label class="visually-hidden" for="reply-text">Mensagem</label>
+        <textarea
+          id="reply-text"
+          name="body"
+          class="form-input chat-input write-area"
+          rows="6"
+          placeholder="Mensagem"
+          data-chat-limit="<?= CHAT_MESSAGE_MAX ?>"
+          data-chat-lines="<?= CHAT_MESSAGE_MAX_LINES ?>"
+          aria-describedby="reply-counter"
+          required
+        ><?= e($replyText) ?></textarea>
+        <p id="reply-error" class="chat-edit-error" role="alert" hidden></p>
         <?php if ($canUploadForumFiles): ?>
-          <div class="form-group">
-            <label class="form-label" for="reply-attachments">Imagens e arquivos (opcional)</label>
-            <input type="file" id="reply-attachments" name="attachments[]" class="form-input" multiple
-                   accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
-            <small class="form-note">Até 5 arquivos, 10 MB por arquivo.</small>
-          </div>
+          <input type="file" id="reply-attachments" name="attachments[]" class="form-input write-files" aria-label="Anexos" multiple
+                 accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
         <?php endif; ?>
-
-        <button type="submit" id="reply-form-submit" class="button button-primary">Enviar</button>
+        <div class="chat-tools write-tools">
+          <div class="emoji-wrap">
+            <button type="button" class="emoji-toggle" data-emoji-target="reply-text" aria-label="Inserir emoji" aria-haspopup="true" aria-expanded="false">😊</button>
+          </div>
+          <small id="reply-counter" class="field-counter" aria-live="polite">0/<?= CHAT_MESSAGE_MAX ?></small>
+          <button type="submit" id="reply-form-submit" class="button button-primary write-send">Enviar</button>
+        </div>
       </form>
     <?php endif; ?>
   </section>

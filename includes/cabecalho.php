@@ -11,7 +11,6 @@ $navItems = [
     ['pages/subjects.php', 'Matérias', 'subjects'],
     ['pages/live-class.php', 'Aulas ao vivo', 'live'],
     ['pages/forum.php', 'Fóruns', 'forum'],
-    ['pages/messages.php', 'Mensagens', 'messages'],
 ];
 if ($user && $user['role'] === 'teacher') {
     $navItems[] = ['pages/teacher-dashboard.php', 'Painel do professor', 'dashboard'];
@@ -46,6 +45,18 @@ $sectionOf = [
 ];
 $activeFile = $sectionOf[$currentFile] ?? $currentFile;
 
+$socialBadge = ['requests' => 0, 'messages' => 0, 'total' => 0];
+if ($user) {
+    require_once __DIR__ . '/social.php';
+    try {
+        socialEnsureSchema($pdo);
+        socialTouchPresence($pdo, (int) $user['id']);
+        $socialBadge = socialBadgeCounts($pdo, (int) $user['id']);
+    } catch (Throwable $socialError) {
+        error_log('cabecalho.php:social: ' . $socialError->getMessage());
+    }
+}
+
 $headerInitials = '';
 if ($user) {
     $nameParts = array_slice(preg_split('/\s+/', trim($user['name'])) ?: [], 0, 2);
@@ -72,8 +83,7 @@ if ($user) {
 </head>
 <body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"<?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
 <header id="site-header" class="site-header">
-  <a id="site-logo" class="site-logo"
-   href="<?= e($baseUrl) ?>index.php">
+  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">
     <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
     <span class="site-logo-text">Hi Teach</span>
   </a>
@@ -84,8 +94,18 @@ if ($user) {
       <?php endforeach; ?>
     </ul>
   </nav>
-  <div id="header-actions" class="header-actions">
+  <div id="header-actions" class="header-actions"<?php if ($user): ?> data-social-endpoint="<?= e($baseUrl) ?>endpoints/presence.php" data-social-csrf="<?= e(csrfToken()) ?>" data-social-interval="<?= PRESENCE_HEARTBEAT_SECONDS ?>"<?php endif; ?>>
     <?php if ($user): ?>
+      <?php
+      $badgeText = $socialBadge['total'] > 99 ? '99+' : (string) $socialBadge['total'];
+      $badgeLabel = $socialBadge['total'] > 0
+          ? 'Contatos, conversas e pedidos (' . $socialBadge['total'] . ' novos)'
+          : 'Contatos, conversas e pedidos';
+      ?>
+      <a id="header-chat" class="header-chat" href="<?= e($baseUrl) ?>pages/contacts.php" aria-label="<?= e($badgeLabel) ?>" title="Contatos"<?= $currentFile === 'contacts.php' ? ' aria-current="page"' : '' ?>>
+        <svg class="header-chat-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="header-chat-badge" class="header-chat-badge" data-social-badge<?= $socialBadge['total'] > 0 ? '' : ' hidden' ?>><?= e($badgeText) ?></span>
+      </a>
       <a id="header-avatar" class="header-avatar" href="<?= e($baseUrl) ?>pages/profile.php" aria-label="Meu perfil" title="Meu perfil"<?= $currentFile === 'profile.php' ? ' aria-current="page"' : '' ?>>
         <?php if ($user['avatar_mime']): ?>
           <img class="header-avatar-image" src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">

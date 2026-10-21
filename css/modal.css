@@ -26,6 +26,9 @@
   backdrop-filter: blur(10px);
   transition-delay: 0s;
 }
+.modal.modal-wide {
+  max-width: 900px;
+}
 .modal {
   width: 100%;
   max-width: 480px;

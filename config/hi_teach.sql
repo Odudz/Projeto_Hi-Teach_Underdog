@@ -192,3 +192,76 @@ INSERT IGNORE INTO subjects (name, description) VALUES
     ('Engenharia de Requisitos', 'Levantamento e análise de requisitos.'),
     ('Desenvolvimento Web', 'HTML, CSS, JavaScript e mais.'),
     ('Banco de Dados', 'Modelagem e SQL.');
+
+/* ---------- Amizades, presença e mensagens privadas ---------- */
+
+CREATE TABLE IF NOT EXISTS friendships (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_a INT UNSIGNED NOT NULL,
+    user_b INT UNSIGNED NOT NULL,
+    requested_by INT UNSIGNED NOT NULL,
+    status ENUM('pending', 'accepted') NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_friend_pair (user_a, user_b),
+    KEY idx_friend_b (user_b, status),
+    KEY idx_friend_requester (requested_by, status, created_at),
+    CONSTRAINT fk_friend_a FOREIGN KEY (user_a) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_friend_b FOREIGN KEY (user_b) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_friend_req FOREIGN KEY (requested_by) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker_id INT UNSIGNED NOT NULL,
+    blocked_id INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (blocker_id, blocked_id),
+    KEY idx_block_blocked (blocked_id),
+    CONSTRAINT fk_block_blocker FOREIGN KEY (blocker_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_block_blocked FOREIGN KEY (blocked_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS private_messages (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    sender_id INT UNSIGNED NOT NULL,
+    recipient_id INT UNSIGNED NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    edited_at TIMESTAMP NULL DEFAULT NULL,
+    read_at TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (id),
+    KEY idx_pm_pair (sender_id, recipient_id, id),
+    KEY idx_pm_inbox (recipient_id, read_at),
+    CONSTRAINT fk_pm_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_pm_recipient FOREIGN KEY (recipient_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_presence (
+    user_id INT UNSIGNED NOT NULL,
+    status ENUM('online', 'busy', 'away', 'invisible') NOT NULL DEFAULT 'online',
+    last_seen_at DATETIME NULL DEFAULT NULL,
+    PRIMARY KEY (user_id),
+    CONSTRAINT fk_presence_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS dm_threads (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_a INT UNSIGNED NOT NULL,
+    user_b INT UNSIGNED NOT NULL,
+    initiator_id INT UNSIGNED NOT NULL,
+    status ENUM('pending', 'accepted', 'declined') NOT NULL DEFAULT 'pending',
+    hidden_a TINYINT(1) NOT NULL DEFAULT 0,
+    hidden_b TINYINT(1) NOT NULL DEFAULT 0,
+    cleared_a INT UNSIGNED NOT NULL DEFAULT 0,
+    cleared_b INT UNSIGNED NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL DEFAULT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_thread_pair (user_a, user_b),
+    KEY idx_thread_b (user_b, hidden_b),
+    KEY idx_thread_initiator (initiator_id, status, created_at),
+    CONSTRAINT fk_thread_a FOREIGN KEY (user_a) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_thread_b FOREIGN KEY (user_b) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_thread_initiator FOREIGN KEY (initiator_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;

@@ -27,6 +27,7 @@ $navIcons = [
     'subjects' => '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
     'live' => '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
     'forum' => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    'messages' => '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><polyline points="22,6 12,13 2,6"/>',
     'dashboard' => '<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
     'admin' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
     'login' => '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
@@ -82,7 +83,10 @@ if ($user) {
 </head>
 <body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"<?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
 <header id="site-header" class="site-header">
-  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">Hi Teach</a>
+  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">
+    <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
+    <span class="site-logo-text">Hi Teach</span>
+  </a>
   <nav id="main-nav" class="main-nav">
     <ul class="nav-list">
       <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>

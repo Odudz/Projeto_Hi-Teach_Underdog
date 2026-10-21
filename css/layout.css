@@ -294,7 +294,6 @@
 #subjects-preview,
 #subject-list,
 #course-list,
-#forum-list,
 #classroom-activities {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -307,7 +306,6 @@
     #subjects-preview,
     #subject-list,
     #course-list,
-    #forum-list,
     #classroom-activities
   )
   > .section-title {

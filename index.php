@@ -68,7 +68,7 @@ include_once __DIR__ . '/includes/cabecalho.php';
       <p class="card-text">Discuta cada matéria.</p>
     </a>
 
-    <a class="card feature-card" href="pages/classroom.php" style="text-decoration: none;">
+    <a class="card feature-card" href="pages/subjects.php" style="text-decoration: none;">
       <h3 class="card-title">Salas virtuais</h3>
       <p class="card-text">Materiais e atividades do professor.</p>
     </a>

@@ -1,11 +1,15 @@
 <?php
-include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/courses.php';
 
 if (!$user || $user['role'] !== 'teacher') {
     $gate = $user ? 'teacher' : 'login';
     $baseUrl = '../';
     include_once __DIR__ . '/../includes/acesso-restrito.php';
 }
+
+$stmt = $pdo->prepare('SELECT c.id, c.title, s.name AS subject_name FROM courses c JOIN subjects s ON s.id=c.subject_id WHERE c.teacher_id=? ORDER BY c.updated_at DESC');
+$stmt->execute([$user['id']]);
+$courses = $stmt->fetchAll();
 
 $pageId = 'teacher-dashboard';
 $pageTitle = 'Painel do professor';
@@ -15,6 +19,18 @@ $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
+  <section class="section" data-tab="Cursos">
+    <h2 class="section-title">Meus cursos</h2>
+    <a class="button button-primary" href="subjects.php">Criar curso em Matérias</a>
+    <?php foreach ($courses as $course): ?>
+    <article class="card">
+      <h3 class="card-title"><?= e($course['title']) ?></h3>
+      <p><?= e($course['subject_name']) ?></p>
+      <a href="course.php?id=<?= (int) $course['id'] ?>">Gerenciar aulas e materiais</a>
+    </article>
+    <?php endforeach; ?>
+    <?php if (!$courses): ?><p>Você ainda não tem cursos.</p><?php endif; ?>
+  </section>
   <section id="teacher-videos" class="section" data-tab="Vídeos">
     <h2 class="section-title">Meus vídeos</h2>
     <form id="video-upload-form" class="form" action="#" method="post">

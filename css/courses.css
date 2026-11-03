@@ -1,0 +1,136 @@
+.youtube-player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #111; }
+.youtube-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+/* Reutiliza os elementos visuais do fórum na área de cursos. */
+.courses-content {
+  max-width: 1400px;
+}
+.page-subjects #subject-list,
+.page-subjects #course-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.courses-content section[id] {
+  scroll-margin-top: 12rem;
+}
+.courses-section-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.courses-section-heading .section-title {
+  width: 100%;
+}
+.courses-content .forum-grid {
+  width: 100%;
+}
+.courses-content .forum-chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.course-subject-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  background: var(--color-secondary);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.subject-card.is-selected {
+  border-color: var(--color-primary);
+  background: var(--color-surface-strong);
+}
+.course-secondary-link,
+.course-tile-actions {
+  position: relative;
+  z-index: 2;
+}
+.course-secondary-link {
+  text-underline-offset: 4px;
+}
+.course-tile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.course-tile-actions form {
+  display: flex;
+  margin: 0;
+}
+.course-delete {
+  cursor: pointer;
+}
+.course-delete:hover,
+.course-delete:focus-visible {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+.course-form-panel {
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.course-form-panel .form {
+  width: 100%;
+  max-width: 760px;
+}
+.course-form-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-weight: 700;
+}
+.course-form-panel label:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+}
+.course-form-panel input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+}
+.course-progress {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.course-progress p {
+  margin: 0;
+  font-weight: 700;
+}
+.course-progress progress {
+  width: 100%;
+  height: 16px;
+  accent-color: var(--color-primary);
+}
+.course-links {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.course-links .forum-filter {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .courses-content .forum-tile,
+  .course-form-panel {
+    padding: var(--space-3);
+  }
+  .course-links .forum-filter {
+    width: 100%;
+    text-align: center;
+  }
+}

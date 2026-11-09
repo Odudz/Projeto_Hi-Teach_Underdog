@@ -1,28 +1,27 @@
 <?php
-$debug = getenv('HT_DEBUG') === '1';
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$httpHost = $_SERVER['HTTP_HOST'] ?? '';
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true)
+    || str_contains($serverName, 'localhost')
+    || str_contains($httpHost, 'localhost')
+    || str_contains($serverName, '127.0.0.1')
+    || str_contains($httpHost, '127.0.0.1');
+
+$debug = getenv('HT_DEBUG') === '1' || $isLocal;
 error_reporting(E_ALL);
+// Ativa display_errors no seu computador para nunca mais dar tela branca misteriosa
 ini_set('display_errors', $debug ? '1' : '0');
 ini_set('log_errors', '1');
 
 date_default_timezone_set('America/Sao_Paulo');
 
-// Emojis têm 4 bytes em UTF-8. Sem isto, algumas hospedagens entregam a página
-// como ISO-8859-1 ou gravam no banco como utf8 de 3 bytes, e todo emoji vira "?".
 mb_internal_encoding('UTF-8');
 ini_set('default_charset', 'UTF-8');
 if (!headers_sent()) {
     header('Content-Type: text/html; charset=UTF-8');
 }
-
-/* CASO VOCE QUEIRA CRIAR UM USUÁRIO, POR UMA SENHA E DAR PERMISSÕES, COLOQUE OS VALORES DESEJADOS ABAIXO
- 
- CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'localhost' IDENTIFIED BY 'SENHA_DESEJADA';
- CREATE USER IF NOT EXISTS 'EMAIL_TESTE'@'127.0.0.1' IDENTIFIED BY 'SENHA_DESEJADA';
- GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'localhost';
- GRANT ALL PRIVILEGES ON hi_teach.* TO 'EMAIL_TESTE'@'127.0.0.1';
- FLUSH PRIVILEGES; 
- 
- */
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
@@ -36,25 +35,49 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$dbHost = getenv('HT_DB_HOST') ?: '127.0.0.1';
-$dbName = getenv('HT_DB_NAME') ?: 'hi_teach';
-$dbUser = getenv('HT_DB_USER') ?: 'root';
-$dbPass = getenv('HT_DB_PASS') !== false ? getenv('HT_DB_PASS') : '';
+if ($isLocal) {
+    $dbHost = getenv('HT_DB_HOST') ?: '127.0.0.1';
+    $dbName = getenv('HT_DB_NAME') ?: 'hi_teach';
+    $dbUser = getenv('HT_DB_USER') ?: 'root';
+    $dbPass = getenv('HT_DB_PASS') !== false ? getenv('HT_DB_PASS') : '';
+} else {
+    $dbHost = getenv('HT_DB_HOST') ?: 'sql213.infinityfree.com';
+    $dbName = getenv('HT_DB_NAME') ?: 'if0_43131727_hi_teach';
+    $dbUser = getenv('HT_DB_USER') ?: 'if0_43131727';
+    $dbPass = getenv('HT_DB_PASS') !== false ? getenv('HT_DB_PASS') : '6ZE8alv4Iy1fYH';
+}
 
 const SUPPORT_EMAIL = 'suporte@seudominio.com.br';
 
 try {
-    $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [
+    $dsn = "mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4";
+    $pdo = new PDO($dsn, $dbUser, $dbPass, [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
-        // Alguns servidores ignoram o charset do DSN; este comando força a conexão inteira em utf8mb4.
         PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
     ]);
 } catch (PDOException $error) {
-    error_log('conexao.php: ' . $error->getMessage());
-    http_response_code(500);
-    die('Não foi possível conectar ao banco de dados no momento. Tente novamente em instantes.');
+    if ($isLocal && ($error->getCode() == 1049 || str_contains($error->getMessage(), 'Unknown database'))) {
+        try {
+            $pdoRoot = new PDO("mysql:host=$dbHost;charset=utf8mb4", $dbUser, $dbPass);
+            $pdoRoot->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
+            ]);
+        } catch (Throwable $e) {
+            error_log('conexao.php auto-db: ' . $e->getMessage());
+            http_response_code(500);
+            die("Não foi possível conectar ao banco de dados local '$dbName'. Crie o banco de dados no phpMyAdmin do XAMPP.");
+        }
+    } else {
+        error_log('conexao.php: ' . $error->getMessage());
+        http_response_code(500);
+        die('Não foi possível conectar ao banco de dados no momento: ' . $error->getMessage());
+    }
 }
 
 function e($text)

@@ -4,7 +4,8 @@
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/social.php';
 
-$isFetch = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
+$isFetch = ($_GET['ajax'] ?? '') === '1'
+    || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
 
 function presenceJson(int $status, array $payload): never
 {

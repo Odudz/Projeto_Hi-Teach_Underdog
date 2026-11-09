@@ -61,10 +61,10 @@
 <script src="<?= e($baseUrl) ?>js/modal.js"></script>
 <script src="<?= e($baseUrl) ?>js/settings.js"></script>
 <?php if (!empty($user)): ?>
-<script src="<?= e($baseUrl) ?>js/social.js"></script>
+<script src="<?= e($baseUrl) ?>js/social.js?v=3"></script>
 <?php endif; ?>
 <?php foreach ($extraJs ?? [] as $script): ?>
-<script src="<?= e($baseUrl) ?>js/<?= e($script) ?>.js"></script>
+<script src="<?= e($baseUrl) ?>js/<?= e($script) ?>.js?v=4"></script>
 <?php endforeach; ?>
 <script src="<?= e($baseUrl) ?>js/main.js"></script>
 </body>

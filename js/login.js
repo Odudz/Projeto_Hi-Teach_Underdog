@@ -103,13 +103,16 @@
 			const response = await fetch(form.action, {
 				method: "POST",
 				headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-				body: new FormData(form),
+				// A recuperação só envia texto; não use multipart/form-data.
+				body: new URLSearchParams(new FormData(form)),
 			});
-			let result;
-			try {
-				result = await response.json();
-			} catch {
-				throw new Error("O servidor respondeu de forma inesperada. Tente novamente.");
+			const responseText = await response.text();
+			let result = null;
+			try { result = JSON.parse(responseText); } catch { /* A hospedagem pode devolver HTML. */ }
+			if (!result) {
+				throw new Error(response.status === 403
+					? "A hospedagem recusou a solicitação (HTTP 403/OpenResty)."
+					: `O servidor respondeu com HTTP ${response.status}, mas não retornou JSON válido.`);
 			}
 
 			if (result.ok) {

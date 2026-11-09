@@ -1,4 +1,8 @@
 (() => {
+    document.addEventListener('submit', (event) => {
+        const message = event.submitter?.dataset.confirm;
+        if (message && !window.confirm(message)) event.preventDefault();
+    });
 	const LEAVE_MS = 650;
 	const REVEAL_START_MS = 450;
 	const REVEAL_SELECTOR =
@@ -99,8 +103,12 @@
 		const dir = location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1);
 		return dir.replace(/(pages|auth)\/$/, "");
 	};
-	const hrefFor = (root, key) =>
-		root + (ROOT_FILES.includes(key) ? "" : "pages/") + key;
+	const hrefFor = (root, key) => {
+        const courseId = document.getElementById('main-content')?.dataset.courseId;
+        const context = ['course.php', 'classroom.php'].includes(key) && /^\d+$/.test(courseId || '')
+            ? '?id=' + courseId : '';
+		return root + (ROOT_FILES.includes(key) ? "" : "pages/") + key + context;
+    };
 
 	const buildTrail = (key) => {
 		const trail = [];

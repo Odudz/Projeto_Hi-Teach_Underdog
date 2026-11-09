@@ -209,7 +209,7 @@ if ($canCreateForum) {
       <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
     </header>
     <div class="forum-new-grid">
-      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="multipart/form-data">
+      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="application/x-www-form-urlencoded">
         <?= csrfInput() ?>
         <div class="form-group">
           <label class="form-label" for="new-subject">Matéria</label>

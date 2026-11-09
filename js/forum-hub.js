@@ -5,6 +5,16 @@
 	const subject = form.elements.subject_id;
 	const title = form.elements.title;
 	const body = form.elements.body;
+	const attachmentInput = form.querySelector('input[type="file"][name="attachments[]"]');
+
+	// InfinityFree is currently returning 403/OpenResty for multipart POSTs.
+	// A forum without actual attachments must be sent as URL-encoded form data.
+	// Keep multipart only when the user really selected a file.
+	form.addEventListener("submit", () => {
+		const hasFiles = Array.from(attachmentInput?.files || []).some((file) => file.size > 0);
+		form.enctype = hasFiles ? "multipart/form-data" : "application/x-www-form-urlencoded";
+	});
+
 	const preview = document.querySelector("[data-preview]");
 	if (!preview) return;
 

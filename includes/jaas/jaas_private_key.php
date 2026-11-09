@@ -1,0 +1,37 @@
+<?php
+// Chave privada do JaaS. NUNCA compartilhe, não coloque no Git e não envie a ninguém.
+//
+// Como preencher: abra o seu arquivo .pk no Bloco de Notas, copie TUDO
+// (da linha BEGIN até a linha END) e cole no lugar do exemplo abaixo.
+// Não deixe espaços antes das linhas e não apague a última linha (JAASPRIVATEKEY;).
+
+return <<<'JAASPRIVATEKEY'
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCt/A0+NrPIfJO3
+iwH/bBxixwHlVMK1wMK+mQ0Ba7uQ8N+boeVo+EBra7wv7GQwZx95LIDN8jUiQu4a
+CF5/InBVqo3r/Z8J9qaZ5YQ0ZDIiBxm8ZbmOdhtM5LE5MnZ3PWPldKDShtuIf//6
+XyA1yvSBzGTEn9PD0oBUYI45AuCdkK2z4KjGBLrfqVWdwkap3TCWGTWfbxQ60gvx
+ZsKW3+9P+gKeS8Yvo/TtHn2spIn3B1EZ0300u1kRjs1OgS+snhkClqKwlyPc9fQZ
+z6Bzf+WPlf6vojCC9yPzcw7PBIIwMCNKoJaQOQuME2PnCnbi3r8FhBKJcowu91K9
+zRzpal99AgMBAAECggEAAkGsokvvVQBYoh7JbdinHZjbK3BH/jd7zyEJDCWrjxuw
+qsIUyaG+pCYHkM+OFRqhS98J5KHpkoIvuGK3Zwq5TkMiCBeIAocSbhiN+Gf8Rni1
+Gr5vA6wAeqTUr5s58h33t7glhdV9721JkqO9NTVmqnBONkakZnvKck22SoMBCsoa
+DDvtuooQ1xuPkxt0LN94F340cmDTssL6EV+3PrHjOElpOhoy1ulgwUtdEjVzjhRE
+PUEtCoYCyD3sjf/fQ8eKhXnI1KDWAHNI8M6s8f/LQZnXKNAX/l7Rg+SvLtCXCkGi
+dAiSXqbNepcZ3qwFC692fEwk5ig+qX5XtOGJvB1EwQKBgQD2giE1Q8rsgXWk7vk2
+/5QyTuqxM1PT2ooUZ6ADtqHclO4TApz1BIfJWU8fKvRAQW0qewkeY6kVOYe/7X3Q
+8G2bjB4PWS1boFvUx+uWBlTVz+YQofMZUyZS9bgKS6Loe2Qc5lLy66i0BLOuvYXC
+aunOiR1kOWX0hok36BJypF1zxQKBgQC0rwtb4EE4oYttntCBaVaOjZFSQFp5uTnc
+7dUEBdmBgtZ5F1aXAhWlDNjlj/zbnsQ4O5QRzlhY2Z81KENw6R+ImeruLCTsl8Ws
+2FTBVqiTPnQRZUADxY6XjaH/Pi3XfmHMEER7hONtZXepySzYstWQyLXUxcQQNRP+
+J+BtiWqgWQKBgQDWTL6t3ae1/73UiuQhCgM90Rl6v1Jq5JwRrRyQ3d7NMrPd1vG4
+mB2rz3ZXdDIvAjHzMk71GlLN3tvC4KX2VG4VQbSIR1CFTV1IGB0YqZxq3Hf3kbMT
+GxRAHtnGKYcQcOTRsvH9uR1KkqPaj2yPXf6wzMa+cJ/P+n2kGp6fB4EuuQKBgEJy
+IQY/mRyfY+wDPIBq4Zb4/tk1q1AaSuoxWGXrVMqo+AB+Eazk6lrRN65sXjvRzi0z
+08cckCbUmRTuYqbSRHNyzw+ZklajleFziO+007eafwqqpnj8nOyk/E8maatW4dYu
+oVCfVRe0+eWpguGKGrns5dmChRDExD5yIbmGkHy5AoGAKSxMTN88h0/t7KHeglCz
+9pW5h59JTxC0PoInzupX7RiO3CGDn4jvr2rbBtqLe/tHfL091Q9c0EuTFfeGcn3j
+jibkvVE6ng92NPSfzr4u/HYohcmMPmD0+kfFCDrDZTUP4NGSkHph5h5ZuIp5rM2G
+dugB5YIBFpL2lH8Scqr50iA=
+-----END PRIVATE KEY-----
+JAASPRIVATEKEY;

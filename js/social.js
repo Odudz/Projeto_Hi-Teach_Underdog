@@ -4,7 +4,6 @@
 	const csrf = header?.dataset.socialCsrf || "";
 	if (!endpoint) return;
 
-	const interval = (Number(header.dataset.socialInterval) || 60) * 1000;
 	const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const notify = (type, message) => window.HiTeach?.notify?.(type, message);
 	const badge = document.querySelector("[data-social-badge]");
@@ -52,44 +51,36 @@
 	};
 
 	const post = async (data) => {
-		const body = new FormData();
-		body.append("csrf_token", csrf);
-		Object.entries(data).forEach(([key, value]) => body.append(key, value));
-		const response = await fetch(endpoint, {
+		// Sem arquivos: application/x-www-form-urlencoded evita multipart desnecessário.
+		const body = new URLSearchParams();
+		body.set("csrf_token", csrf);
+		Object.entries(data).forEach(([key, value]) => body.set(key, String(value)));
+		const url = new URL(endpoint, location.href);
+		url.searchParams.set("ajax", "1");
+		const response = await fetch(url, {
 			method: "POST",
-			headers: { "X-Requested-With": "fetch", Accept: "application/json" },
+			headers: { Accept: "application/json" },
 			body,
 		});
-		const payload = await response.json().catch(() => null);
-		if (!response.ok || !payload?.ok) throw new Error(payload?.error || "Não foi possível atualizar agora.");
+		const responseText = await response.text();
+		let payload = null;
+		try { payload = JSON.parse(responseText); } catch { /* A camada web pode responder HTML. */ }
+		if (!response.ok || !payload?.ok) {
+			const fallback = response.status === 403
+				? "A hospedagem recusou a atualização (HTTP 403)."
+				: `Não foi possível atualizar agora (HTTP ${response.status}).`;
+			throw new Error(payload?.error || fallback);
+		}
 		return payload;
 	};
 
-	let lastBeat = 0;
-	let beating = false;
-	const beat = async () => {
-		if (beating) return;
-		beating = true;
-		try {
-			const payload = await post({});
-			lastBeat = Date.now();
-			setBadge(payload.badge);
-			applyFriends(payload.friends);
-			applyOwnStatus(payload.status);
-		} catch {
-			/* sem rede ou sessão expirada: tenta de novo no próximo ciclo */
-		} finally {
-			beating = false;
-		}
-	};
-
-	setInterval(() => {
-		if (!document.hidden) beat();
-	}, interval);
-	document.addEventListener("visibilitychange", () => {
-		if (!document.hidden && Date.now() - lastBeat > interval / 2) beat();
-	});
-	window.addEventListener("online", beat);
+	// Uma atualização ao abrir cada página, sem heartbeat recorrente.
+	// A hospedagem gratuita não aceita aplicações de chat com consultas automáticas contínuas.
+	post({}).then((payload) => {
+		setBadge(payload.badge);
+		applyFriends(payload.friends);
+		applyOwnStatus(payload.status);
+	}).catch(() => {});
 
 	/* --------------------------------------------------- troca de status */
 	document.querySelectorAll("[data-status-picker]").forEach((form) => {
@@ -110,74 +101,8 @@
 		});
 	});
 
-	/* ----------------------------------- conversa: rolar e receber mensagens */
-	const list = document.getElementById("message-list");
-	if (!list || !list.dataset.dmWith) return;
+	/* A atualização automática da conversa foi desativada nesta hospedagem.
+	 * Recarregue a página para ver mensagens recebidas; isso evita polling contínuo.
+	 */
 
-	const scrollDown = (smooth) => {
-		list.scrollTo({ top: list.scrollHeight, behavior: smooth && !reduced() ? "smooth" : "auto" });
-	};
-	scrollDown(false);
-
-	let lastId = Number(list.dataset.dmLast) || 0;
-	let polling = false;
-	const poll = async () => {
-		if (polling || document.hidden) return;
-		polling = true;
-		try {
-			const response = await fetch(`${list.dataset.dmPoll}&after=${lastId}`, {
-				headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-			});
-			if (response.status === 403) {
-				location.href = "contacts.php";
-				return;
-			}
-			const payload = await response.json().catch(() => null);
-			if (!response.ok || !payload?.ok) return;
-			lastId = Math.max(lastId, Number(payload.last_id) || 0);
-			if (payload.state && list.dataset.dmState && payload.state !== list.dataset.dmState) {
-				const draft = document.getElementById("reply-text");
-				if (window.HiDM?.applyMode(payload.mode)) {
-					list.dataset.dmState = payload.state;
-				} else if (draft && draft.value.trim() !== "") {
-					if (!list.dataset.dmStateWarned) {
-						list.dataset.dmStateWarned = "1";
-						notify("success", "Esta conversa mudou. Envie ou copie o que escreveu e recarregue a página.");
-					}
-				} else {
-					location.reload();
-					return;
-				}
-			}
-			if (!payload.html) return;
-			const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 140;
-			const holder = document.createElement("template");
-			holder.innerHTML = payload.html.trim();
-			holder.content.querySelectorAll(".chat-message").forEach((item) => {
-				if (list.querySelector(`#${item.id}`)) return;
-				item.classList.add("is-new");
-				item.addEventListener("animationend", (event) => {
-					if (event.target === item) item.classList.remove("is-new");
-				});
-				list.append(item);
-			});
-			if (nearBottom) scrollDown(true);
-		} catch {
-			/* tenta de novo no próximo ciclo */
-		} finally {
-			polling = false;
-		}
-	};
-	const pollDelay = () => (["awaiting", "incoming"].includes(list.dataset.dmMode) ? 3000 : 8000);
-	const pollLoop = async () => {
-		await poll();
-		setTimeout(pollLoop, pollDelay());
-	};
-	setTimeout(pollLoop, pollDelay());
-	document.addEventListener("visibilitychange", () => {
-		if (!document.hidden) poll();
-	});
-
-	// O marcador só avança com mensagens do amigo. As minhas (enviadas por aqui) não entram:
-	// se uma mensagem dele chegou antes de eu enviar a minha, ela ainda precisa ser buscada.
 })();

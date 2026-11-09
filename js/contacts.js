@@ -155,6 +155,48 @@
 	};
 
 	if (list && form && sendButton && area) {
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+			if (sendButton.disabled || !area.value.trim()) return;
+
+			const action = new URL(form.action, location.href);
+			action.searchParams.set("ajax", "1");
+			sendButton.disabled = true;
+			sendButton.classList.add("is-sending");
+			try {
+				const response = await fetch(action, {
+					method: "POST",
+					headers: { Accept: "application/json" },
+					// Mensagem de texto não contém arquivos: evite multipart/form-data.
+					body: new URLSearchParams(new FormData(form)),
+				});
+				const responseText = await response.text();
+				let payload = null;
+				try { payload = JSON.parse(responseText); } catch { /* A camada da hospedagem pode devolver HTML. */ }
+				if (!response.ok || !payload?.ok) {
+					const fallback = response.status === 403
+						? "A hospedagem recusou o envio (HTTP 403). A resposta veio do servidor web, não do sistema; a mensagem não foi confirmada."
+						: `Não foi possível enviar sua mensagem (HTTP ${response.status}).`;
+					throw new Error(payload?.error || fallback);
+				}
+				const holder = document.createElement("template");
+				holder.innerHTML = payload.html || "";
+				const message = holder.content.firstElementChild;
+				if (message) {
+					list.querySelector("[data-dm-start]")?.remove();
+					list.append(message);
+					list.scrollTop = list.scrollHeight;
+				}
+				area.value = "";
+				area.dispatchEvent(new Event("input", { bubbles: true }));
+			} catch (error) {
+				notify("error", error.message);
+			} finally {
+				sendButton.disabled = false;
+				sendButton.classList.remove("is-sending");
+			}
+		});
+
 		let wasSending = false;
 		let ownBefore = 0;
 		const own = () => list.querySelectorAll(".chat-message.is-own").length;

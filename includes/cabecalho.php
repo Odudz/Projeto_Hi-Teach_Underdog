@@ -15,8 +15,8 @@ $navItems = [
 if ($user && $user['role'] === 'teacher') {
     $navItems[] = ['pages/teacher-dashboard.php', 'Painel do professor', 'dashboard'];
 }
-if ($user && $user['role'] === 'admin') {
-    $navItems[] = ['pages/moderator-dashboard.php', 'Administração', 'admin'];
+if ($user && in_array($user['role'], ['moderator', 'admin'], true)) {
+    $navItems[] = ['pages/moderator-dashboard.php', $user['role'] === 'admin' ? 'Administração' : 'Moderação', 'admin'];
 }
 if (!$user) {
     $navItems[] = ['auth/login.php', 'Entrar', 'login'];
@@ -60,68 +60,95 @@ if ($user) {
 $headerInitials = '';
 if ($user) {
     $nameParts = array_slice(preg_split('/\s+/', trim($user['name'])) ?: [], 0, 2);
-    $headerInitials = mb_strtoupper(implode('', array_map(fn ($part) => mb_substr($part, 0, 1), $nameParts)));
+    $headerInitials = mb_strtoupper(implode('', array_map(fn($part) => mb_substr($part, 0, 1), $nameParts)));
 }
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($pageTitle) ?> | Hi Teach</title>
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/base.css">
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/themes.css">
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/layout.css">
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/components.css">
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/modal.css">
-<?php foreach ($extraCss as $sheet): ?>
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/<?= e($sheet) ?>.css">
-<?php endforeach; ?>
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/settings.css">
-<link rel="stylesheet" href="<?= e($baseUrl) ?>css/animations.css">
-<script src="<?= e($baseUrl) ?>js/theme.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= e($pageTitle) ?> | Hi Teach</title>
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/base.css">
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/themes.css">
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/layout.css">
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/components.css">
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/modal.css">
+    <?php foreach ($extraCss as $sheet): ?>
+        <link rel="stylesheet" href="<?= e($baseUrl) ?>css/<?= e($sheet) ?>.css">
+    <?php endforeach; ?>
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/settings.css">
+    <link rel="stylesheet" href="<?= e($baseUrl) ?>css/animations.css">
+    <script src="<?= e($baseUrl) ?>js/theme.js"></script>
 </head>
-<body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"<?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
-<header id="site-header" class="site-header">
-  <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">
-    <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
-    <span class="site-logo-text">Hi Teach</span>
-  </a>
-  <nav id="main-nav" class="main-nav">
-    <ul class="nav-list">
-      <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>
-        <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link" id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($baseUrl . $href) ?>"<?= $currentFile === basename($href) ? ' aria-current="page"' : ($activeFile === basename($href) ? ' aria-current="true"' : '') ?>><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?= $navIcons[$icon] ?></svg><span><?= e($label) ?></span></a></li>
-      <?php endforeach; ?>
-    </ul>
-  </nav>
-  <div id="header-actions" class="header-actions"<?php if ($user): ?> data-social-endpoint="<?= e($baseUrl) ?>endpoints/presence.php" data-social-csrf="<?= e(csrfToken()) ?>" data-social-interval="<?= PRESENCE_HEARTBEAT_SECONDS ?>"<?php endif; ?>>
-    <?php if ($user): ?>
-      <?php
-      $badgeText = $socialBadge['total'] > 99 ? '99+' : (string) $socialBadge['total'];
-      $badgeLabel = $socialBadge['total'] > 0
-          ? 'Contatos, conversas e pedidos (' . $socialBadge['total'] . ' novos)'
-          : 'Contatos, conversas e pedidos';
-      ?>
-      <a id="header-chat" class="header-chat" href="<?= e($baseUrl) ?>pages/contacts.php" aria-label="<?= e($badgeLabel) ?>" title="Contatos"<?= $currentFile === 'contacts.php' ? ' aria-current="page"' : '' ?>>
-        <svg class="header-chat-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span id="header-chat-badge" class="header-chat-badge" data-social-badge<?= $socialBadge['total'] > 0 ? '' : ' hidden' ?>><?= e($badgeText) ?></span>
-      </a>
-      <a id="header-avatar" class="header-avatar" href="<?= e($baseUrl) ?>pages/profile.php" aria-label="Meu perfil" title="Meu perfil"<?= $currentFile === 'profile.php' ? ' aria-current="page"' : '' ?>>
-        <?php if ($user['avatar_mime']): ?>
-          <img class="header-avatar-image" src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
-        <?php else: ?>
-          <span class="header-avatar-initials"><?= e($headerInitials) ?></span>
+
+<body id="page-<?= e($pageId) ?>" class="page page-<?= e($pageId) ?>"
+    <?= $openModal !== '' ? ' data-open-modal="' . e($openModal) . '"' : '' ?>>
+    <header id="site-header" class="site-header">
+        <a id="site-logo" class="site-logo" href="<?= e($baseUrl) ?>index.php">
+            <?= file_get_contents(__DIR__ . '/../img/logo.svg') ?>
+            <span class="site-logo-text">Hi Teach</span>
+        </a>
+        <nav id="main-nav" class="main-nav">
+            <ul class="nav-list">
+                <?php foreach ($navItems as $index => [$href, $label, $icon]): ?>
+                    <li class="nav-item" style="--i: <?= $index ?>"><a class="nav-link"
+                            id="nav-<?= e(basename($href, '.php')) ?>" href="<?= e($baseUrl . $href) ?>"
+                            <?= $currentFile === basename($href) ? ' aria-current="page"' : ($activeFile === basename($href) ? ' aria-current="true"' : '') ?>><svg
+                                class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                aria-hidden="true"><?= $navIcons[$icon] ?></svg><span><?= e($label) ?></span></a></li>
+                <?php endforeach; ?>
+            </ul>
+        </nav>
+        <div id="header-actions" class="header-actions" <?php if ($user): ?>
+            data-social-endpoint="<?= e($baseUrl) ?>endpoints/presence.php" data-social-csrf="<?= e(csrfToken()) ?>"
+            <?php endif; ?>>
+            <?php if ($user): ?>
+                <?php
+                $badgeText = $socialBadge['total'] > 99 ? '99+' : (string) $socialBadge['total'];
+                $badgeLabel = $socialBadge['total'] > 0
+                    ? 'Contatos, conversas e pedidos (' . $socialBadge['total'] . ' novos)'
+                    : 'Contatos, conversas e pedidos';
+                ?>
+                <a id="header-chat" class="header-chat" href="<?= e($baseUrl) ?>pages/contacts.php"
+                    aria-label="<?= e($badgeLabel) ?>" title="Contatos"
+                    <?= $currentFile === 'contacts.php' ? ' aria-current="page"' : '' ?>>
+                    <svg class="header-chat-icon" viewBox="0 0 24 24" width="16" height="16" fill="none"
+                        stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span id="header-chat-badge" class="header-chat-badge"
+                        data-social-badge<?= $socialBadge['total'] > 0 ? '' : ' hidden' ?>><?= e($badgeText) ?></span>
+                </a>
+                <a id="header-avatar" class="header-avatar" href="<?= e($baseUrl) ?>pages/profile.php"
+                    aria-label="Meu perfil" title="Meu perfil"
+                    <?= $currentFile === 'profile.php' ? ' aria-current="page"' : '' ?>>
+                    <?php if ($user['avatar_mime']): ?>
+                        <img class="header-avatar-image"
+                            src="<?= e($baseUrl) ?>endpoints/image.php?user=<?= (int) $user['id'] ?>&amp;type=avatar" alt="">
+                    <?php else: ?>
+                        <span class="header-avatar-initials"><?= e($headerInitials) ?></span>
+                    <?php endif; ?>
+                </a>
+            <?php endif; ?>
+            <button type="button" id="settings-button" class="settings-button" aria-label="Abrir opções"
+                aria-haspopup="dialog" aria-expanded="false" data-modal-open="settings-modal">
+                <svg class="settings-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+    <div id="flash-area" class="flash-area">
+        <?php if (!empty($_SESSION['flash'])): ?>
+            <div class="alert alert-<?= e($_SESSION['flash'][0]) ?>" role="alert"><?= e($_SESSION['flash'][1]) ?></div>
+            <?php unset($_SESSION['flash']); ?>
         <?php endif; ?>
-      </a>
-    <?php endif; ?>
-    <button type="button" id="settings-button" class="settings-button" aria-label="Abrir opções" aria-haspopup="dialog" aria-expanded="false" data-modal-open="settings-modal">
-      <svg class="settings-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-  </div>
-</header>
-<div id="flash-area" class="flash-area">
-  <?php if (!empty($_SESSION['flash'])): ?>
-    <div class="alert alert-<?= e($_SESSION['flash'][0]) ?>" role="alert"><?= e($_SESSION['flash'][1]) ?></div>
-    <?php unset($_SESSION['flash']); ?>
-  <?php endif; ?>
-</div>
+    </div>

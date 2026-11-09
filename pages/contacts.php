@@ -14,7 +14,8 @@ socialEnsureSchema($pdo);
 $me = (int) $user['id'];
 $withId = (int) ($_GET['with'] ?? 0);
 $self = 'contacts.php' . ($withId > 0 ? '?with=' . $withId : '');
-$isFetch = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
+$isFetch = ($_GET['ajax'] ?? '') === '1'
+    || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
 
 const DM_PAGE_SIZE = 100;
 const DM_PAGE_SIZE_ALL = 500;

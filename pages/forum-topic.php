@@ -27,7 +27,6 @@ if (!$topic) {
 $self = 'forum-topic.php?id=' . $topicId;
 $replyText = '';
 $canModerate = $user && in_array($user['role'], ['admin', 'moderator', 'teacher'], true);
-$canUploadForumFiles = $user && in_array($user['role'], ['admin', 'teacher'], true);
 $isOwner = $user && (int) $user['id'] === (int) $topic['author_id'];
 $canManage = $isOwner || $canModerate;
 
@@ -132,10 +131,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $replyStatus = 403;
         } else {
             $replyError = chatValidate($replyText);
-            if ($replyError === null && !empty($_FILES['attachments']['name'][0]) && !$canUploadForumFiles) {
-                $replyError = 'Apenas professores e administradores podem enviar anexos no fórum.';
-                $replyStatus = 403;
-            }
         }
 
         if ($replyError === null) {
@@ -144,9 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('INSERT INTO forum_posts (topic_id, user_id, body) VALUES (?, ?, ?)')
                     ->execute([$topicId, $user['id'], $replyText]);
                 $postId = (int) $pdo->lastInsertId();
-                if (!empty($_FILES['attachments']['name'][0])) {
-                    saveForumAttachments($_FILES['attachments'], $topicId, $postId, $pdo);
-                }
                 $pdo->commit();
 
                 if ($isFetch) {
@@ -561,10 +553,6 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     placeholder="Escreva sua resposta..." data-chat-limit="<?= CHAT_MESSAGE_MAX ?>"
                     data-chat-lines="<?= CHAT_MESSAGE_MAX_LINES ?>" required><?= e($replyText) ?></textarea>
                 <p id="reply-error" class="chat-edit-error" role="alert" hidden></p>
-                <?php if ($canUploadForumFiles): ?>
-                    <input type="file" id="reply-attachments" name="attachments[]" class="form-input write-files" multiple
-                        accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
-                <?php endif; ?>
                 <div class="chat-tools write-tools">
                     <small id="reply-counter" class="field-counter" aria-live="polite">0/<?= CHAT_MESSAGE_MAX ?></small>
                     <button type="submit" id="reply-form-submit" class="button button-primary write-send">Enviar

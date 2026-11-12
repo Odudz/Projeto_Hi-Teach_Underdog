@@ -2,8 +2,10 @@
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/rbac.php';
 require_once __DIR__ . '/../includes/ui-helpers.php';
+require_once __DIR__ . '/../includes/ui-icons.php';
 
 ensureAdmin();
+rbacEnsureSchema($pdo);
 
 const USERS_PER_PAGE = 25;
 
@@ -214,210 +216,293 @@ function formatCpf(string $cpf): string
     return $cpf ?: '—';
 }
 
+/** Resumo legível de uma alteração registrada na auditoria (ex.: "Cargo: Aluno → Professor"). */
+function apDiff(?string $old, ?string $new): string
+{
+    $labels = ['role' => 'Cargo', 'activate' => 'Conta'];
+    $before = json_decode((string) $old, true);
+    $after = json_decode((string) $new, true);
+
+    if (!is_array($before) && !is_array($after)) {
+        return ($old ?? '—') . ' → ' . ($new ?? '—');
+    }
+
+    $before = is_array($before) ? $before : [];
+    $after = is_array($after) ? $after : [];
+    $lines = [];
+    foreach (array_unique(array_merge(array_keys($before), array_keys($after))) as $key) {
+        $fmt = function ($value) use ($key): string {
+            if ($value === null) {
+                return '—';
+            }
+            if ($key === 'role') {
+                return rbacRoleLabel((string) $value);
+            }
+            if ($key === 'activate') {
+                return (int) $value === 1 ? 'Ativa' : 'Desativada';
+            }
+            return is_scalar($value) ? (string) $value : (string) json_encode($value, JSON_UNESCAPED_UNICODE);
+        };
+        $lines[] = ($labels[$key] ?? (string) $key) . ': ' . $fmt($before[$key] ?? null) . ' → ' . $fmt($after[$key] ?? null);
+    }
+    return implode(' · ', $lines);
+}
+
+// Totais por cargo para o topo do painel
+$roleCounts = [];
+$inactiveCount = 0;
+try {
+    foreach ($pdo->query('SELECT role, COUNT(*) AS n FROM users GROUP BY role')->fetchAll() as $r) {
+        $roleCounts[(string) $r['role']] = (int) $r['n'];
+    }
+    $inactiveCount = (int) $pdo->query('SELECT COUNT(*) FROM users WHERE activate = 0')->fetchColumn();
+} catch (Throwable $e) {
+}
+$allUsersCount = array_sum($roleCounts);
+
+$formQuery = $queryParameters ? '?' . http_build_query($queryParameters) : '';
+$hasFilters = $search !== '' || $filterRole !== '' || $filterStatus !== '';
+
+// Janela de páginas: 1 … atual-2..atual+2 … última
+$pageWindow = [];
+for ($i = 1; $i <= $totalPages; $i++) {
+    if ($i === 1 || $i === $totalPages || abs($i - $page) <= 2) {
+        $pageWindow[] = $i;
+    }
+}
+
 $pageId = 'admin-users';
 $pageTitle = 'Usuários e cargos';
-$extraCss = ['tabs', 'staff'];
-$extraJs = ['tabs', 'staff'];
+$extraCss = ['ui-kit', 'admin-panels'];
+$extraJs = ['ui-kit', 'staff'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
-<main id="main-content" class="main-content">
-  <header class="staff-header">
-    <div>
-      <h1 class="staff-title">Gestão de Usuários e Cargos</h1>
-      <p class="staff-subtitle">Controle de acessos, papéis de usuários, ativação de contas e auditoria de ações.</p>
-    </div>
-    <div class="staff-header-actions">
-      <a class="button button-small button-secondary" href="moderator-dashboard.php">Painel do Administrador</a>
-      <a class="button button-small button-secondary" href="moderation.php">Fila de Moderação</a>
-    </div>
-  </header>
+<main id="main-content" class="main-content ap-main">
 
-  <!-- ABA 1: USUÁRIOS -->
-  <section id="users-section" class="section" data-tab="Usuários" data-tab-badge="<?= $totalUsers ?>">
-    <h2 class="section-title">Contas e Acessos</h2>
+    <!-- ====================== HERO ====================== -->
+    <header class="ap-hero ap-hero--admin">
+        <div class="ap-hero-text">
+            <div class="ap-hero-top"><?= uiRoleBadge('admin') ?></div>
+            <h1 class="ap-title">Usuários e cargos</h1>
+            <p class="ap-subtitle">Controle de acessos, papéis de usuários, ativação de contas e auditoria das ações da equipe.</p>
+        </div>
+        <div class="ap-hero-actions">
+            <a class="button button-small" href="moderator-dashboard.php"><?= uiIcon('overview', 16) ?>Painel da administração</a>
+            <a class="button button-small" href="moderation.php"><?= uiIcon('shield', 16) ?>Fila de moderação</a>
+        </div>
+    </header>
 
-    <form class="filter-bar" action="admin-users.php" method="get" role="search" style="align-items: center;">
-      <input type="search" name="q" class="form-input" maxlength="100" placeholder="Buscar por nome, e-mail ou CPF" value="<?= e($search) ?>" aria-label="Buscar usuário" style="flex: 1 1 240px; max-width: 320px;">
-      
-      <select name="role" class="form-input" style="width: auto;">
-        <option value="">Todos os cargos</option>
-        <?php foreach (RBAC_ROLES as $r): ?>
-          <option value="<?= e($r) ?>"<?= $filterRole === $r ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
-        <?php endforeach; ?>
-      </select>
+    <div class="ap-shell">
 
-      <select name="status" class="form-input" style="width: auto;">
-        <option value="">Todos os status</option>
-        <option value="active"<?= $filterStatus === 'active' ? ' selected' : '' ?>>Apenas Ativos</option>
-        <option value="inactive"<?= $filterStatus === 'inactive' ? ' selected' : '' ?>>Apenas Desativados</option>
-      </select>
-
-      <button type="submit" class="button button-primary button-small">Filtrar</button>
-      <?php if ($search !== '' || $filterRole !== '' || $filterStatus !== ''): ?>
-        <a href="admin-users.php" class="button button-small button-secondary">Limpar</a>
-      <?php endif; ?>
-    </form>
-
-    <?php if (!$users): ?>
-      <div class="empty-state">
-        <strong>Nenhum usuário encontrado com os filtros selecionados.</strong>
-      </div>
-    <?php else: ?>
-      <table id="users-table" class="table">
-        <thead>
-          <tr>
-            <th class="table-head">Usuário / E-mail</th>
-            <th class="table-head">Contato / CPF</th>
-            <th class="table-head">Cargo Atual</th>
-            <th class="table-head">Status</th>
-            <th class="table-head">Ações Administrativas</th>
-          </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($users as $row):
-            $uid = (int) $row['id'];
-            $isSelf = $uid === (int) $user['id'];
-            $isActive = (int) $row['activate'] === 1;
-        ?>
-          <tr class="table-row">
-            <td class="table-cell">
-              <strong><a href="profile-view.php?id=<?= $uid ?>"><?= e($row['name']) ?></a></strong>
-              <span class="tag-id">#<?= $uid ?></span>
-              <div class="item-note"><?= e($row['email']) ?></div>
-            </td>
-            <td class="table-cell">
-              <div><?= e($row['phone'] ?: 'Sem telefone') ?></div>
-              <small class="item-note">CPF: <?= e(formatCpf((string) $row['cpf'])) ?></small>
-            </td>
-            <td class="table-cell">
-              <?= uiRoleBadge((string) $row['role']) ?>
-            </td>
-            <td class="table-cell">
-              <span class="chip <?= $isActive ? 'chip-primary' : 'chip-danger' ?>">
-                <?= $isActive ? 'Ativa' : 'Desativada' ?>
-              </span>
-            </td>
-            <td class="table-cell">
-              <?php if ($isSelf): ?>
-                <span class="chip chip-muted">Sua conta atual</span>
-              <?php else: ?>
-                <!-- Ação 1: Alterar Cargo -->
-                <details class="decision" style="display:inline-block; margin-right: 4px;">
-                  <summary class="button button-small button-secondary">Alterar Cargo</summary>
-                  <form class="decision-form" action="admin-users.php<?= $queryParameters ? '?' . http_build_query($queryParameters) : '' ?>" method="post">
-                    <?= csrfInput() ?>
-                    <input type="hidden" name="action" value="change_role">
-                    <input type="hidden" name="user_id" value="<?= $uid ?>">
-                    <label class="field">
-                      <span>Novo Cargo</span>
-                      <select name="role" class="form-input">
-                        <?php foreach (RBAC_ROLES as $r): ?>
-                          <option value="<?= e($r) ?>"<?= $r === $row['role'] ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
-                        <?php endforeach; ?>
-                      </select>
-                    </label>
-                    <label class="field field-wide">
-                      <span>Motivo da Mudança de Cargo *</span>
-                      <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Ex.: Promovido para auxílio na moderação" required>
-                    </label>
-                    <button type="submit" class="button button-primary button-small">Confirmar Cargo</button>
-                  </form>
-                </details>
-
-                <!-- Ação 2: Ativar / Desativar Conta -->
-                <details class="decision" style="display:inline-block;">
-                  <summary class="button button-small <?= $isActive ? 'button-danger' : 'button-primary' ?>">
-                    <?= $isActive ? 'Desativar' : 'Reativar' ?>
-                  </summary>
-                  <form class="decision-form" action="admin-users.php<?= $queryParameters ? '?' . http_build_query($queryParameters) : '' ?>" method="post">
-                    <?= csrfInput() ?>
-                    <input type="hidden" name="action" value="toggle_active">
-                    <input type="hidden" name="user_id" value="<?= $uid ?>">
-                    <label class="field field-wide">
-                      <span>Motivo <?= $isActive ? 'da Desativação' : 'da Reativação' ?> *</span>
-                      <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Explique o motivo desta ação administrativa" required>
-                    </label>
-                    <button type="submit" class="button button-small <?= $isActive ? 'button-danger' : 'button-primary' ?>">
-                      <?= $isActive ? 'Confirmar Desativação' : 'Confirmar Reativação' ?>
-                    </button>
-                  </form>
-                </details>
-              <?php endif; ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-
-      <?php if ($totalPages > 1): ?>
-        <nav class="forum-pager" aria-label="Paginação de usuários" style="margin-top: var(--space-4);">
-          <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-            <?php
-            $pageParams = array_merge($queryParameters, ['page' => $i]);
-            $pageUrl = 'admin-users.php?' . http_build_query($pageParams);
-            ?>
-            <?php if ($i === $page): ?>
-              <strong class="forum-page is-active" aria-current="page"><?= $i ?></strong>
-            <?php else: ?>
-              <a class="forum-page" href="<?= e($pageUrl) ?>"><?= $i ?></a>
-            <?php endif; ?>
-          <?php endfor; ?>
+        <nav class="ap-nav" data-ap-nav aria-label="Seções do painel">
+            <?= apNavButton('users-section', 'users', 'Usuários', 0) ?>
+            <?= apNavButton('audit-section', 'audit', 'Auditoria', 0) ?>
+            <span class="ap-nav-sep">Atalhos</span>
+            <?= apNavLink('moderator-dashboard.php', 'overview', 'Painel da administração') ?>
+            <?= apNavLink('moderation.php', 'shield', 'Fila de moderação') ?>
         </nav>
-      <?php endif; ?>
-    <?php endif; ?>
-  </section>
 
-  <!-- ABA 2: LOGS DE AUDITORIA -->
-  <section id="audit-section" class="section" data-tab="Histórico de Auditoria">
-    <div class="item-head">
-      <h2 class="section-title" style="margin:0; border:0; padding:0;">Histórico de Ações da Equipe</h2>
-      <form method="get" action="admin-users.php#audit-section" class="inline-form">
-        <select name="audit_act" class="form-input" style="width: auto;">
-          <option value="">Todas as ações</option>
-          <?php foreach ($distinctActions as $act): ?>
-            <option value="<?= e($act) ?>"<?= $auditActionFilter === $act ? ' selected' : '' ?>><?= e(uiAuditLabel((string) $act)) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <button type="submit" class="button button-small button-primary">Filtrar</button>
-        <?php if ($auditActionFilter !== ''): ?>
-          <a href="admin-users.php#audit-section" class="button button-small button-secondary">Limpar</a>
-        <?php endif; ?>
-      </form>
+        <div class="ap-content">
+
+            <!-- ====================== USUÁRIOS ====================== -->
+            <section id="users-section" class="ap-panel" data-ap-panel>
+                <div class="ap-panel-head">
+                    <div>
+                        <h2 class="ap-panel-title">Contas e acessos <span class="chip"><?= $totalUsers ?></span></h2>
+                        <p class="ap-panel-sub">Clique em um usuário para alterar o cargo ou ativar/desativar a conta. Toda ação exige um motivo e fica registrada.</p>
+                    </div>
+                </div>
+
+                <div class="ap-stats ap-stats--compact">
+                    <?= apStat('users', $allUsersCount, 'Total de contas') ?>
+                    <?= apStat('shield', $roleCounts['admin'] ?? 0, 'Administradores') ?>
+                    <?= apStat('shield', $roleCounts['moderator'] ?? 0, 'Moderadores') ?>
+                    <?= apStat('teacher', $roleCounts['teacher'] ?? 0, 'Professores') ?>
+                    <?= apStat('book', $roleCounts['student'] ?? 0, 'Alunos') ?>
+                    <?= apStat('lock', $inactiveCount, 'Desativadas', '', null, $inactiveCount > 0) ?>
+                </div>
+
+                <form class="ap-filter" action="admin-users.php" method="get" role="search">
+                    <label class="ap-search">
+                        <?= uiIcon('search', 18) ?><span class="ui-sr">Buscar usuário</span>
+                        <input type="search" name="q" class="form-input" maxlength="100" placeholder="Nome, e-mail ou CPF" value="<?= e($search) ?>">
+                    </label>
+                    <select name="role" class="form-input" aria-label="Filtrar por cargo">
+                        <option value="">Todos os cargos</option>
+                        <?php foreach (RBAC_ROLES as $r): ?>
+                            <option value="<?= e($r) ?>"<?= $filterRole === $r ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <select name="status" class="form-input" aria-label="Filtrar por status">
+                        <option value="">Todos os status</option>
+                        <option value="active"<?= $filterStatus === 'active' ? ' selected' : '' ?>>Apenas ativos</option>
+                        <option value="inactive"<?= $filterStatus === 'inactive' ? ' selected' : '' ?>>Apenas desativados</option>
+                    </select>
+                    <button type="submit" class="button button-primary button-small">Filtrar</button>
+                    <?php if ($hasFilters): ?><a href="admin-users.php" class="button button-small">Limpar</a><?php endif; ?>
+                </form>
+
+                <?php if (!$users): ?>
+                    <div class="ui-empty"><strong>Nenhum usuário encontrado com os filtros selecionados.</strong></div>
+                <?php else: ?>
+                    <ul class="ap-list" id="users-table">
+                        <?php foreach ($users as $row):
+                            $uid = (int) $row['id'];
+                            $isSelf = $uid === (int) $user['id'];
+                            $isActive = (int) $row['activate'] === 1;
+                            $summary = '<span class="avatar">' . e(uiInitials((string) $row['name'])) . '</span>';
+                        ?>
+                            <li class="ap-user">
+                                <?php if ($isSelf): ?>
+                                    <div class="ap-user-static">
+                                        <?= $summary ?>
+                                        <span class="ap-user-id">
+                                            <strong class="ui-ellipsis"><?= e($row['name']) ?></strong>
+                                            <small class="ui-ellipsis"><?= e($row['email']) ?> · #<?= $uid ?></small>
+                                        </span>
+                                        <span class="ap-user-chips"><?= uiRoleBadge((string) $row['role']) ?><span class="chip chip-muted">Sua conta atual</span></span>
+                                    </div>
+                                <?php else: ?>
+                                    <details class="ui-details ap-user-details">
+                                        <summary>
+                                            <?= $summary ?>
+                                            <span class="ap-user-id">
+                                                <strong class="ui-ellipsis" title="<?= e($row['name']) ?>"><?= e($row['name']) ?></strong>
+                                                <small class="ui-ellipsis" title="<?= e($row['email']) ?>"><?= e($row['email']) ?> · #<?= $uid ?></small>
+                                            </span>
+                                            <span class="ap-user-chips">
+                                                <?= uiRoleBadge((string) $row['role']) ?>
+                                                <span class="chip <?= $isActive ? 'chip-primary' : 'chip-danger' ?>"><?= $isActive ? 'Ativa' : 'Desativada' ?></span>
+                                            </span>
+                                            <span class="ap-user-manage"><span>Gerenciar</span><span class="ui-chevron" aria-hidden="true"></span></span>
+                                        </summary>
+                                        <div class="ui-details-body"><div class="ui-details-inner ap-manage-grid">
+
+                                            <div class="ap-manage-box">
+                                                <h4>Dados da conta</h4>
+                                                <dl class="ap-facts">
+                                                    <div><dt>Perfil:</dt><dd><a href="profile-view.php?id=<?= $uid ?>">Abrir perfil</a></dd></div>
+                                                    <div><dt>Telefone:</dt><dd><?= e($row['phone'] ?: 'Sem telefone') ?></dd></div>
+                                                    <div><dt>CPF:</dt><dd><?= e(formatCpf((string) $row['cpf'])) ?></dd></div>
+                                                    <div><dt>Cadastro:</dt><dd><?= e(date('d/m/Y H:i', strtotime((string) $row['created_at']))) ?></dd></div>
+                                                    <div><dt>Último acesso:</dt><dd><?= !empty($row['last_login_at']) ? e(date('d/m/Y H:i', strtotime((string) $row['last_login_at']))) : 'Nunca' ?></dd></div>
+                                                </dl>
+                                            </div>
+
+                                            <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>" method="post">
+                                                <h4>Alterar cargo</h4>
+                                                <?= csrfInput() ?>
+                                                <input type="hidden" name="action" value="change_role">
+                                                <input type="hidden" name="user_id" value="<?= $uid ?>">
+                                                <label class="ui-field">
+                                                    <span class="ui-field-top"><span class="ui-field-label">Novo cargo</span></span>
+                                                    <select name="role" class="form-input">
+                                                        <?php foreach (RBAC_ROLES as $r): ?>
+                                                            <option value="<?= e($r) ?>"<?= $r === $row['role'] ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </label>
+                                                <label class="ui-field">
+                                                    <span class="ui-field-top"><span class="ui-field-label">Motivo *</span></span>
+                                                    <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Ex.: Promovido para auxiliar na moderação" required autocomplete="off">
+                                                </label>
+                                                <div class="ui-actions">
+                                                    <button type="submit" class="button button-primary button-small"
+                                                        data-confirm="O cargo de <?= e(mb_strimwidth((string) $row['name'], 0, 50, '…')) ?> será alterado e a ação ficará registrada na auditoria."
+                                                        data-confirm-title="Confirmar mudança de cargo?" data-confirm-yes="Alterar cargo">Confirmar cargo</button>
+                                                </div>
+                                            </form>
+
+                                            <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>" method="post">
+                                                <h4><?= $isActive ? 'Desativar conta' : 'Reativar conta' ?></h4>
+                                                <?= csrfInput() ?>
+                                                <input type="hidden" name="action" value="toggle_active">
+                                                <input type="hidden" name="user_id" value="<?= $uid ?>">
+                                                <label class="ui-field">
+                                                    <span class="ui-field-top"><span class="ui-field-label">Motivo <?= $isActive ? 'da desativação' : 'da reativação' ?> *</span></span>
+                                                    <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Explique o motivo desta ação" required autocomplete="off">
+                                                </label>
+                                                <div class="ui-actions">
+                                                    <button type="submit" class="button button-small <?= $isActive ? 'button-delete' : 'button-primary' ?>"
+                                                        data-confirm="<?= $isActive ? e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' perderá o acesso à plataforma.' : e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' voltará a ter acesso à plataforma.' ?>"
+                                                        data-confirm-title="<?= $isActive ? 'Desativar conta?' : 'Reativar conta?' ?>"
+                                                        data-confirm-yes="<?= $isActive ? 'Desativar' : 'Reativar' ?>"
+                                                        <?= $isActive ? 'data-confirm-tone="danger"' : '' ?>><?= $isActive ? 'Confirmar desativação' : 'Confirmar reativação' ?></button>
+                                                </div>
+                                            </form>
+
+                                        </div></div>
+                                    </details>
+                                <?php endif; ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+
+                    <?php if ($totalPages > 1): ?>
+                        <nav class="ap-pager" aria-label="Paginação de usuários">
+                            <?php $previous = 0; foreach ($pageWindow as $i):
+                                if ($previous && $i - $previous > 1): ?><span class="ap-page" aria-hidden="true">…</span><?php endif;
+                                $previous = $i;
+                                $pageUrl = 'admin-users.php?' . http_build_query(array_merge($queryParameters, ['page' => $i])) . '#users-section';
+                                if ($i === $page): ?>
+                                    <strong class="ap-page is-active" aria-current="page"><?= $i ?></strong>
+                                <?php else: ?>
+                                    <a class="ap-page" href="<?= e($pageUrl) ?>"><?= $i ?></a>
+                                <?php endif;
+                            endforeach; ?>
+                        </nav>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </section>
+
+            <!-- ====================== AUDITORIA ====================== -->
+            <section id="audit-section" class="ap-panel" data-ap-panel>
+                <div class="ap-panel-head">
+                    <div>
+                        <h2 class="ap-panel-title">Histórico de auditoria</h2>
+                        <p class="ap-panel-sub">As 50 ações administrativas mais recentes.</p>
+                    </div>
+                </div>
+
+                <form method="get" action="admin-users.php#audit-section" class="ap-filter">
+                    <select name="audit_act" class="form-input" aria-label="Filtrar por ação">
+                        <option value="">Todas as ações</option>
+                        <?php foreach ($distinctActions as $act): ?>
+                            <option value="<?= e($act) ?>"<?= $auditActionFilter === $act ? ' selected' : '' ?>><?= e(uiAuditLabel((string) $act)) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="button button-small button-primary">Filtrar</button>
+                    <?php if ($auditActionFilter !== ''): ?><a href="admin-users.php#audit-section" class="button button-small">Limpar</a><?php endif; ?>
+                </form>
+
+                <?php if (!$logs): ?>
+                    <div class="ui-empty"><strong>Nenhum registro para este critério.</strong></div>
+                <?php else: ?>
+                    <ul class="ap-list" id="audit-table">
+                        <?php foreach ($logs as $log): ?>
+                            <li class="ap-log">
+                                <div class="ap-log-time">
+                                    <?= e(date('d/m/Y', strtotime((string) $log['created_at']))) ?>
+                                    <small><?= e(date('H:i', strtotime((string) $log['created_at']))) ?></small>
+                                </div>
+                                <div class="ap-log-body">
+                                    <div class="ap-log-head">
+                                        <strong><?= e($log['actor_name'] ?? 'Sistema') ?></strong>
+                                        <span class="chip chip-muted"><?= e(uiAuditLabel((string) $log['action'])) ?></span>
+                                        <span class="ap-muted">alvo: <?= e($log['target_name'] ?? ($log['target_type'] . ' #' . $log['target_id'])) ?></span>
+                                    </div>
+                                    <div class="ap-log-diff"><?= e(apDiff($log['old_value'] ?? null, $log['new_value'] ?? null)) ?></div>
+                                    <?php if (!empty($log['reason'])): ?><p class="ap-log-reason"><strong>Motivo:</strong> <?= e($log['reason']) ?></p><?php endif; ?>
+                                    <?php if ($log['ip'] !== null): ?><span class="ap-log-ip">IP <?= e((string) @inet_ntop($log['ip'])) ?></span><?php endif; ?>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </section>
+
+        </div>
     </div>
-
-    <?php if (!$logs): ?>
-      <div class="empty-state" style="margin-top: var(--space-3);">
-        <strong>Nenhum log registrado para este critério.</strong>
-      </div>
-    <?php else: ?>
-      <table id="audit-table" class="table" style="margin-top: var(--space-3);">
-        <thead>
-          <tr>
-            <th class="table-head">Data/Hora</th>
-            <th class="table-head">Responsável</th>
-            <th class="table-head">Ação</th>
-            <th class="table-head">Alvo</th>
-            <th class="table-head">Alteração</th>
-            <th class="table-head">Motivo Registrado</th>
-            <th class="table-head">IP</th>
-          </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($logs as $log): ?>
-          <tr class="table-row">
-            <td class="table-cell"><?= e(date('d/m/Y H:i', strtotime($log['created_at']))) ?></td>
-            <td class="table-cell"><strong><?= e($log['actor_name'] ?? 'Sistema') ?></strong></td>
-            <td class="table-cell"><span class="chip chip-muted"><?= e(uiAuditLabel((string) $log['action'])) ?></span></td>
-            <td class="table-cell"><?= e($log['target_name'] ?? ($log['target_type'] . ' #' . $log['target_id'])) ?></td>
-            <td class="table-cell"><small><?= e(($log['old_value'] ?? '—') . ' → ' . ($log['new_value'] ?? '—')) ?></small></td>
-            <td class="table-cell"><?= e($log['reason'] ?? '—') ?></td>
-            <td class="table-cell"><small><?= e($log['ip'] !== null ? (string) @inet_ntop($log['ip']) : '—') ?></small></td>
-          </tr>
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    <?php endif; ?>
-  </section>
 </main>
 <?php include_once __DIR__ . '/../includes/rodape.php'; ?>

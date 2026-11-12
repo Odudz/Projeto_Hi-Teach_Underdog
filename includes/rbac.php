@@ -36,10 +36,16 @@ function rbacClientIp(): ?string
 
 function rbacEnsureSchema(PDO $pdo): void
 {
-    if (!empty($_SESSION['rbac_schema_checked_v3'])) {
+    if (!empty($_SESSION['rbac_schema_checked_v4'])) {
         return;
     }
     try {
+        // Garante que users.role aceite 'moderator' (bancos criados antes desta versão tinham o enum sem ele)
+        $roleType = $pdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")->fetchColumn();
+        if (is_string($roleType) && !str_contains($roleType, "'moderator'")) {
+            $pdo->exec("ALTER TABLE users MODIFY role ENUM('student', 'teacher', 'moderator', 'admin') NOT NULL DEFAULT 'student'");
+        }
+
         $tail = 'ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci';
 
         $pdo->exec(
@@ -97,7 +103,7 @@ function rbacEnsureSchema(PDO $pdo): void
             ) $tail"
         );
 
-        $_SESSION['rbac_schema_checked_v3'] = true;
+        $_SESSION['rbac_schema_checked_v4'] = true;
     } catch (Throwable $e) {
         error_log('rbacEnsureSchema: ' . $e->getMessage());
     }

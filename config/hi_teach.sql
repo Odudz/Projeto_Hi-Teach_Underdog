@@ -1,5 +1,3 @@
-CREATE DATABASE IF NOT EXISTS hi_teach CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE hi_teach;
 
 /* CASO VOCE QUEIRA CRIAR UM USUÁRIO, POR UMA SENHA E DAR PERMISSÕES, COLOQUE OS VALORES DESEJADOS ABAIXO
  
@@ -20,7 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20) DEFAULT NULL,
     bio VARCHAR(250) DEFAULT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role ENUM('student', 'teacher', 'admin') NOT NULL DEFAULT 'student',
+    role ENUM('student', 'teacher', 'moderator', 'admin') NOT NULL DEFAULT 'student',
     activate TINYINT(1) NOT NULL DEFAULT 1,
     recovery_phrase_hash VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

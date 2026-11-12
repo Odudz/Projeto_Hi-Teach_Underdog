@@ -9,7 +9,8 @@
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/recovery.php';
 
-$wantsJson = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
+$wantsJson = ($_GET['ajax'] ?? '') === '1'
+    || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
 
 function recoverRespond(bool $wantsJson, int $status, array $payload): never
 {

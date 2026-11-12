@@ -70,13 +70,22 @@
 			save.disabled = true;
 			save.textContent = "Salvando…";
 			try {
-				const response = await fetch(edit.getAttribute("action"), {
+				const action = new URL(edit.getAttribute("action"), location.href);
+				action.searchParams.set("ajax", "1");
+				const response = await fetch(action, {
 					method: "POST",
-					headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-					body: new FormData(edit),
+					headers: { Accept: "application/json" },
+					body: new URLSearchParams(new FormData(edit)),
 				});
-				const data = await response.json().catch(() => null);
-				if (!response.ok || !data?.ok) throw new Error(data?.error || "Não foi possível salvar agora.");
+				const responseText = await response.text();
+				let data = null;
+				try { data = JSON.parse(responseText); } catch { /* A hospedagem pode devolver HTML. */ }
+				if (!response.ok || !data?.ok) {
+					const fallback = response.status === 403
+						? "A hospedagem recusou a edição (HTTP 403/OpenResty)."
+						: `Não foi possível salvar agora (HTTP ${response.status}).`;
+					throw new Error(data?.error || fallback);
+				}
 				document.querySelector("[data-topic-title]").textContent = data.title;
 				if (desc) desc.textContent = data.body;
 				document.title = `${data.title} | Hi Teach`;
@@ -97,64 +106,7 @@
 		});
 	}
 
-	if (!list || !list.dataset.topicPoll) return;
+	// Atualização automática desativada: nesta hospedagem, novas respostas aparecem
+	// ao recarregar a página. Isso evita consultas periódicas em segundo plano.
 
-	const lastId = () =>
-		[...list.querySelectorAll(".chat-message[data-post-id]")].reduce(
-			(max, item) => Math.max(max, Number(item.dataset.postId) || 0),
-			0,
-		);
-	if (!location.hash.startsWith("#post-")) list.scrollTop = list.scrollHeight;
-	const repliesNode = document.querySelector("[data-stat-replies]");
-	const peopleNode = document.querySelector("[data-stat-people]");
-	const closedNow = header?.dataset.closed === "1";
-	let polling = false;
-
-	const poll = async () => {
-		if (polling || document.hidden) return;
-		polling = true;
-		try {
-			const response = await fetch(`${list.dataset.topicPoll}&after=${lastId()}`, {
-				headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-			});
-			const data = await response.json().catch(() => null);
-			if (!response.ok || !data?.ok) return;
-
-			if (data.html) {
-				const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 140;
-				const holder = document.createElement("template");
-				holder.innerHTML = data.html.trim();
-				let added = 0;
-				holder.content.querySelectorAll(".chat-message").forEach((item) => {
-					if (list.querySelector(`#${item.id}`)) return;
-					item.classList.add("is-new");
-					item.addEventListener("animationend", (event) => {
-						if (event.target === item) item.classList.remove("is-new");
-					});
-					list.append(item);
-					added += 1;
-				});
-				if (added) {
-					list.querySelector("[data-topic-empty]")?.remove();
-					if (nearBottom) list.scrollTo({ top: list.scrollHeight, behavior: reduced() ? "auto" : "smooth" });
-				}
-			}
-			if (repliesNode && Number(repliesNode.textContent) !== data.replies) repliesNode.textContent = String(data.replies);
-			if (peopleNode && Number(peopleNode.textContent) !== data.people) peopleNode.textContent = String(data.people);
-
-			if (data.closed !== closedNow) {
-				const draft = document.getElementById("reply-text");
-				if (!draft || draft.value.trim() === "") location.reload();
-			}
-		} catch {
-			polling = false;
-		} finally {
-			polling = false;
-		}
-	};
-
-	setInterval(poll, 6000);
-	document.addEventListener("visibilitychange", () => {
-		if (!document.hidden) poll();
-	});
 })();

@@ -1,5 +1,5 @@
 <?php
-include_once __DIR__ . '/../config/conexao.php';
+require_once __DIR__ . '/../includes/courses.php';
 
 if (!$user || $user['role'] !== 'teacher') {
     $gate = $user ? 'teacher' : 'login';
@@ -7,168 +7,180 @@ if (!$user || $user['role'] !== 'teacher') {
     include_once __DIR__ . '/../includes/acesso-restrito.php';
 }
 
+// 1. Cursos do professor
+$stmt = $pdo->prepare(
+    'SELECT c.*, s.name AS subject_name,
+            (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
+            (SELECT COUNT(*) FROM course_enrollments e WHERE e.course_id = c.id) AS student_count
+     FROM courses c 
+     JOIN subjects s ON s.id = c.subject_id 
+     WHERE c.teacher_id = ? 
+     ORDER BY c.updated_at DESC'
+);
+$stmt->execute([$user['id']]);
+$courses = $stmt->fetchAll();
+
+// 2. Respostas dos alunos nas atividades dos cursos deste professor
+$stmt = $pdo->prepare(
+    'SELECT sub.*, act.title AS activity_title, c.title AS course_title, u.name AS student_name
+     FROM activity_submissions sub
+     JOIN course_activities act ON act.id = sub.activity_id
+     JOIN courses c ON c.id = act.course_id
+     JOIN users u ON u.id = sub.student_id
+     WHERE c.teacher_id = ?
+     ORDER BY sub.submitted_at DESC LIMIT 50'
+);
+$stmt->execute([$user['id']]);
+$submissions = $stmt->fetchAll();
+
+// 3. Fóruns criados pelo professor
+$stmt = $pdo->prepare(
+    'SELECT t.*, s.name AS subject_name,
+            (SELECT COUNT(*) FROM forum_posts p WHERE p.topic_id = t.id) AS reply_count
+     FROM forum_topics t
+     JOIN subjects s ON s.id = t.subject_id
+     WHERE t.user_id = ?
+     ORDER BY t.created_at DESC'
+);
+$stmt->execute([$user['id']]);
+$teacherTopics = $stmt->fetchAll();
+
 $pageId = 'teacher-dashboard';
-$pageTitle = 'Painel do professor';
-$extraCss = ['tabs'];
-$extraJs = ['tabs'];
+$pageTitle = 'Painel do Professor';
+$extraCss = ['tabs', 'staff'];
+$extraJs = ['tabs', 'staff'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content">
-  <section id="teacher-videos" class="section" data-tab="Vídeos">
-    <h2 class="section-title">Meus vídeos</h2>
-    <form id="video-upload-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="video-title">Título</label>
-        <input type="text" id="video-title" name="video-title" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="video-file">Vídeo</label>
-        <input type="file" id="video-file" name="video-file" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="video-subject">Matéria</label>
-        <select id="video-subject" name="video-subject" class="form-input">
-          <option value="">Selecione</option>
-        </select>
-      </div>
-      <button type="submit" id="video-upload-form-submit" class="button button-primary">Publicar vídeo</button>
-    </form>
-    <table id="teacher-video-table" class="table">
-      <thead>
-        <tr>
-          <th class="table-head">Título</th>
-          <th class="table-head">Matéria</th>
-          <th class="table-head">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="table-row">
-          <td class="table-cell">—</td>
-          <td class="table-cell">—</td>
-          <td class="table-cell">
-            <button type="button" id="edit-video" class="button button-secondary">Editar</button>
-            <button type="button" id="delete-video" class="button button-secondary">Excluir</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <header class="staff-header">
+        <div>
+            <h1 class="staff-title">Painel do Professor</h1>
+            <p class="staff-subtitle">Gerencie seus cursos, salas de aula, avaliações e interações com os alunos.</p>
+        </div>
+        <div class="staff-header-actions">
+            <a class="button button-primary button-small" href="subjects.php#course-create">Novo Curso</a>
+            <a class="button button-secondary button-small" href="live-class.php">Iniciar Live</a>
+        </div>
+    </header>
 
-  <section id="teacher-lives" class="section" data-tab="Transmissões">
-    <h2 class="section-title">Minhas transmissões</h2>
-    <form id="live-create-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="live-title">Título</label>
-        <input type="text" id="live-title" name="live-title" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="live-start">Início</label>
-        <input type="datetime-local" id="live-start" name="live-start" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="live-url">Link</label>
-        <input type="url" id="live-url" name="live-url" class="form-input">
-      </div>
-      <button type="submit" id="live-create-form-submit" class="button button-primary">Agendar aula ao vivo</button>
-    </form>
-    <table id="teacher-live-table" class="table">
-      <thead>
-        <tr>
-          <th class="table-head">Título</th>
-          <th class="table-head">Início</th>
-          <th class="table-head">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="table-row">
-          <td class="table-cell">—</td>
-          <td class="table-cell">—</td>
-          <td class="table-cell">
-            <button type="button" id="start-live" class="button button-secondary">Iniciar</button>
-            <button type="button" id="edit-live" class="button button-secondary">Editar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
+    <!-- ABA 1: MEUS CURSOS -->
+    <section class="section" data-tab="Meus Cursos" data-tab-badge="<?= count($courses) ?>">
+        <h2 class="section-title">Cursos Ministrados</h2>
+        <?php if (!$courses): ?>
+            <div class="empty-state">
+                <strong>Você ainda não criou nenhum curso.</strong>
+                <span>Cadastre seu primeiro curso para começar a adicionar aulas e materiais.</span>
+                <div style="margin-top: var(--space-2);">
+                    <a class="button button-primary button-small" href="subjects.php#course-create">Criar Primeiro Curso</a>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="people-grid">
+                <?php foreach ($courses as $c): ?>
+                    <article class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+                        <div>
+                            <div class="item-head">
+                                <span class="chip chip-muted"><?= e($c['subject_name']) ?></span>
+                                <span
+                                    class="chip <?= $c['is_published'] ? 'chip-primary' : 'chip-muted' ?>"><?= $c['is_published'] ? 'Publicado' : 'Rascunho' ?></span>
+                            </div>
+                            <h3 style="margin-top:var(--space-2);"><?= e($c['title']) ?></h3>
+                            <p class="card-text" style="font-size:0.9rem;">
+                                <?= e(mb_strimwidth((string)$c['description'], 0, 100, '...')) ?></p>
+                        </div>
+                        <div
+                            style="margin-top:var(--space-3); padding-top:var(--space-2); border-top:2px dashed var(--color-surface-strong);">
+                            <small class="item-note"><?= (int)$c['lesson_count'] ?> aula(s) · <?= (int)$c['student_count'] ?>
+                                aluno(s)</small>
+                            <div style="display:flex; gap:var(--space-2); margin-top:var(--space-2);">
+                                <a class="button button-small button-primary"
+                                    href="course.php?id=<?= (int)$c['id'] ?>">Gerenciar Aulas</a>
+                                <a class="button button-small button-secondary"
+                                    href="classroom.php?id=<?= (int)$c['id'] ?>">Sala Virtual</a>
+                            </div>
+                        </div>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </section>
 
-  <section id="teacher-rooms" class="section" data-tab="Salas virtuais">
-    <h2 class="section-title">Salas virtuais</h2>
-    <form id="room-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="room-name">Nome da sala</label>
-        <input type="text" id="room-name" name="room-name" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="room-schedule">Horário limite</label>
-        <input type="datetime-local" id="room-schedule" name="room-schedule" class="form-input">
-      </div>
-      <button type="submit" id="room-form-submit" class="button button-primary">Criar sala</button>
-    </form>
+    <!-- ABA 2: RESPOSTAS E AVALIAÇÕES -->
+    <section class="section" data-tab="Avaliações" data-tab-badge="<?= count($submissions) ?>">
+        <h2 class="section-title">Respostas e Atividades dos Alunos</h2>
+        <?php if (!$submissions): ?>
+            <div class="empty-state">
+                <strong>Nenhum aluno enviou respostas de atividades ainda.</strong>
+            </div>
+        <?php else: ?>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="table-head">Aluno</th>
+                        <th class="table-head">Curso</th>
+                        <th class="table-head">Atividade</th>
+                        <th class="table-head">Nota</th>
+                        <th class="table-head">Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($submissions as $sub): ?>
+                        <tr class="table-row">
+                            <td class="table-cell"><strong><?= e($sub['student_name']) ?></strong></td>
+                            <td class="table-cell"><?= e($sub['course_title']) ?></td>
+                            <td class="table-cell"><?= e($sub['activity_title']) ?></td>
+                            <td class="table-cell">
+                                <?= $sub['grade'] !== null ? '<span class="chip chip-primary">' . number_format((float)$sub['grade'], 1, ',', '') . ' / 10</span>' : '<span class="chip chip-muted">Pendente</span>' ?>
+                            </td>
+                            <td class="table-cell">
+                                <a class="button button-small button-primary"
+                                    href="../activity.php?id=<?= (int)$sub['activity_id'] ?>">Avaliar Resposta</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </section>
 
-    <form id="room-material-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="material-title">Título do material</label>
-        <input type="text" id="material-title" name="material-title" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="material-file">Arquivo</label>
-        <input type="file" id="material-file" name="material-file" class="form-input">
-      </div>
-      <button type="submit" id="room-material-form-submit" class="button button-primary">Publicar material</button>
-    </form>
-
-    <form id="room-activity-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="activity-title">Título</label>
-        <input type="text" id="activity-title" name="activity-title" class="form-input">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="activity-statement">Enunciado</label>
-        <textarea id="activity-statement" name="activity-statement" class="form-input"></textarea>
-      </div>
-      <button type="submit" id="room-activity-form-submit" class="button button-primary">Publicar atividade</button>
-    </form>
-  </section>
-
-  <section id="teacher-answers" class="section" data-tab="Respostas">
-    <h2 class="section-title">Respostas dos alunos</h2>
-    <table id="answer-table" class="table">
-      <thead>
-        <tr>
-          <th class="table-head">Aluno</th>
-          <th class="table-head">Atividade</th>
-          <th class="table-head">Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr class="table-row">
-          <td class="table-cell">—</td>
-          <td class="table-cell">—</td>
-          <td class="table-cell">
-            <button type="button" id="grade-answer" class="button button-secondary">Avaliar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section id="teacher-forums" class="section" data-tab="Fóruns">
-    <h2 class="section-title">Criar fórum</h2>
-    <form id="forum-create-form" class="form" action="#" method="post">
-      <div class="form-group">
-        <label class="form-label" for="forum-title">Título</label>
-        <input type="text" id="forum-title" name="forum-title" class="form-input" maxlength="80">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="forum-subject">Matéria</label>
-        <select id="forum-subject" name="forum-subject" class="form-input">
-          <option value="">Selecione</option>
-        </select>
-      </div>
-      <button type="submit" id="forum-create-form-submit" class="button button-primary">Criar fórum</button>
-    </form>
-  </section>
+    <!-- ABA 3: MEUS FÓRUNS -->
+    <section class="section" data-tab="Fóruns">
+        <div class="item-head">
+            <h2 class="section-title" style="margin:0; border:0; padding:0;">Fóruns que você abriu</h2>
+            <a class="button button-small button-primary" href="forum.php">Criar Fórum</a>
+        </div>
+        <?php if (!$teacherTopics): ?>
+            <div class="empty-state" style="margin-top: var(--space-3);">
+                <strong>Você ainda não abriu nenhum fórum de discussão.</strong>
+            </div>
+        <?php else: ?>
+            <table class="table" style="margin-top: var(--space-3);">
+                <thead>
+                    <tr>
+                        <th class="table-head">Título</th>
+                        <th class="table-head">Matéria</th>
+                        <th class="table-head">Respostas</th>
+                        <th class="table-head">Data</th>
+                        <th class="table-head">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($teacherTopics as $topic): ?>
+                        <tr class="table-row">
+                            <td class="table-cell"><strong><?= e($topic['title']) ?></strong></td>
+                            <td class="table-cell"><?= e($topic['subject_name']) ?></td>
+                            <td class="table-cell"><span class="chip chip-muted"><?= (int)$topic['reply_count'] ?></span></td>
+                            <td class="table-cell"><?= e(date('d/m/Y', strtotime($topic['created_at']))) ?></td>
+                            <td class="table-cell">
+                                <a class="button button-small button-secondary"
+                                    href="forum-topic.php?id=<?= (int)$topic['id'] ?>">Abrir</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </section>
 </main>
 <?php include_once __DIR__ . '/../includes/rodape.php'; ?>

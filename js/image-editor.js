@@ -577,7 +577,15 @@
 				const body = new FormData();
 				body.append("action", kind);
 				body.append("csrf_token", overlay.dataset.csrf || "");
-				body.append("image", blob, `${kind}.jpg`);
+				// O host (InfinityFree) bloqueia com 403 requisições multipart com bytes binários.
+				// Por isso a imagem vai como texto (base64), igual aos campos que já funcionam.
+				const dataUrl = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(String(reader.result));
+					reader.onerror = () => reject(new Error("Não foi possível preparar a imagem."));
+					reader.readAsDataURL(blob);
+				});
+				body.append("image_b64", dataUrl.slice(dataUrl.indexOf(",") + 1));
 				const endpoint = new URL(overlay.dataset.endpoint, window.location.href);
 				const response = await fetch(endpoint.toString(), {
 					method: "POST",

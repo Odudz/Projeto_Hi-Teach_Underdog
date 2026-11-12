@@ -1,0 +1,541 @@
+/* ============================================================
+   Hi Teach — Painéis de Administração e Moderação (prefixo ap-)
+   Usado por moderator-dashboard.php e admin-users.php.
+   Depende de ui-kit.css. Cores vêm só das variáveis do tema.
+   ============================================================ */
+
+.ap-main {
+  max-width: 1240px;
+  gap: var(--space-4);
+}
+
+/* ---------- Faixa de destaque ---------- */
+.ap-hero {
+  --ap-accent: var(--color-primary);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  min-width: 0;
+  padding: calc(var(--space-4) + 10px) var(--space-4) var(--space-4);
+  overflow: hidden;
+  background-color: var(--color-surface);
+  background-image: radial-gradient(var(--color-surface-strong) 1.5px, transparent 1.6px);
+  background-size: 14px 14px;
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.ap-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 10px;
+  background: var(--ap-accent);
+  border-bottom: var(--border);
+}
+.ap-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 22px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  background: var(--color-secondary);
+  border: var(--border);
+  border-radius: 50%;
+  opacity: 0.5;
+}
+.ap-hero--admin { --ap-accent: var(--color-danger); }
+.ap-hero--moderator { --ap-accent: var(--color-primary-hover); }
+
+.ap-hero-text { display: grid; gap: var(--space-2); min-width: 0; flex: 1 1 360px; }
+.ap-hero-top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ap-title { font-size: var(--font-size-2xl); line-height: 1.1; overflow-wrap: anywhere; }
+.ap-subtitle { max-width: 64ch; opacity: 0.85; overflow-wrap: anywhere; }
+.ap-hero-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ---------- Estrutura: navegação lateral + painéis ---------- */
+.ap-shell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+  scroll-margin-top: 84px;
+}
+.ap-content { display: grid; min-width: 0; }
+
+.ap-nav {
+  position: sticky;
+  top: 88px;
+  display: grid;
+  gap: 6px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.ap-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.ap-nav-item > span:not(.ap-nav-badge) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-nav-item:hover,
+.ap-nav-item:focus-visible { background: var(--color-surface-strong); transform: translateX(3px); }
+.ap-nav-item[aria-selected="true"] {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+  transform: none;
+}
+.ap-nav-badge {
+  flex: none;
+  min-width: 26px;
+  margin-left: auto;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--color-background);
+  background: var(--color-text);
+  border-radius: 999px;
+}
+.ap-nav-badge.is-alert { color: var(--color-on-danger); background: var(--color-danger); }
+.ap-nav-item[aria-selected="true"] .ap-nav-badge { color: var(--color-text); background: var(--color-background); }
+.ap-nav-sep {
+  padding: 10px 12px 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+/* ---------- Painéis ---------- */
+.ap-panel {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  align-content: start;
+}
+.ap-panel[hidden] { display: none; }
+.ap-panel.is-entering { animation: ap-panel-in 0.38s var(--ease-out) both; }
+@keyframes ap-panel-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+.ap-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border);
+}
+.ap-panel-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xl);
+  overflow-wrap: anywhere;
+}
+.ap-panel-sub { margin-top: 2px; font-size: var(--font-size-sm); opacity: 0.75; overflow-wrap: anywhere; }
+
+/* ---------- Cartões e blocos ---------- */
+.ap-card {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.ap-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-lg);
+}
+.ap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+  min-width: 0;
+}
+.ap-grid--wide { grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); }
+.ap-list { display: grid; gap: var(--space-2); min-width: 0; }
+
+.ap-id { font-size: 13px; font-weight: 700; opacity: 0.6; }
+.ap-muted { font-size: 14px; opacity: 0.75; overflow-wrap: anywhere; }
+.ap-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ap-label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.65; }
+
+/* ---------- Resumo: estatísticas ---------- */
+.ap-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--space-3);
+}
+.ap-stat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3);
+  color: inherit;
+  text-decoration: none;
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+a.ap-stat:hover,
+a.ap-stat:focus-visible {
+  background: var(--color-surface-strong);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+.ap-stat-icon {
+  display: grid;
+  grid-row: 1 / span 3;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  background: var(--color-background);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+.ap-stat-num { font-size: var(--font-size-2xl); font-weight: 800; line-height: 1; }
+.ap-stat-label { font-weight: 700; overflow-wrap: anywhere; }
+.ap-stat-hint { font-size: 13px; opacity: 0.7; overflow-wrap: anywhere; }
+.ap-stat.is-alert { border-color: var(--color-danger); }
+.ap-stat.is-alert .ap-stat-num { color: var(--color-danger); }
+.ap-stats--compact .ap-stat { padding: var(--space-2) var(--space-3); }
+.ap-stats--compact .ap-stat-icon { display: none; }
+.ap-stats--compact .ap-stat { grid-template-columns: minmax(0, 1fr); }
+.ap-stats--compact .ap-stat-num { font-size: var(--font-size-xl); }
+
+.ap-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+/* ---------- Lista "Precisa de atenção" ---------- */
+.ap-todo { display: grid; gap: var(--space-2); }
+.ap-todo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+a.ap-todo-item:hover { background: var(--color-secondary); transform: translateX(3px); }
+.ap-todo-text { display: grid; flex: 1 1 auto; min-width: 0; }
+.ap-todo-text strong { overflow-wrap: anywhere; }
+.ap-todo-text small { font-size: 13px; opacity: 0.75; overflow-wrap: anywhere; }
+.ap-todo-item.is-ok { border-style: dashed; opacity: 0.8; }
+
+/* ---------- Aulas ao vivo ---------- */
+.ap-live {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 10px 12px;
+  color: inherit;
+  text-decoration: none;
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+a.ap-live:hover { background: var(--color-secondary); }
+.ap-live-dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-danger);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  animation: ap-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ap-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+
+/* ---------- Barra de ferramentas (busca + filtros) ---------- */
+.ap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+.ap-search { position: relative; display: flex; flex: 1 1 240px; align-items: center; max-width: 420px; min-width: 0; }
+.ap-search .ui-icon { position: absolute; left: 12px; pointer-events: none; opacity: 0.6; }
+.ap-search .form-input { width: 100%; min-width: 0; padding-left: 38px; }
+.ap-pills { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ap-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px var(--space-3);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 999px;
+  transition: background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+.ap-pill:hover { background: var(--color-secondary); transform: translateY(-1px); }
+.ap-pill.is-active,
+.ap-pill[aria-pressed="true"] { color: var(--color-on-primary); background: var(--color-primary); }
+.ap-pill small { font-size: 12px; font-weight: 800; opacity: 0.85; }
+.ap-result-count { margin-left: auto; font-size: var(--font-size-sm); font-weight: 700; opacity: 0.75; }
+
+.ap-filter { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+.ap-filter .form-input { width: auto; max-width: 100%; min-width: 0; }
+.ap-filter .ap-search { flex: 1 1 240px; }
+.ap-filter .ap-search .form-input { width: 100%; }
+
+/* ---------- Linhas de lista (cursos, fóruns, lives) ---------- */
+.ap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--duration-fast) var(--ease-out), background-color var(--duration-base) var(--ease-out);
+}
+.ap-row:hover { background: var(--color-surface-strong); box-shadow: var(--shadow-md); }
+.ap-row.is-draft { border-style: dashed; }
+.ap-row-main { display: grid; gap: 4px; min-width: 0; }
+.ap-row-title { font-weight: 800; line-height: 1.25; }
+.ap-row-title a { text-decoration: none; }
+.ap-row-title a:hover { text-decoration: underline; }
+.ap-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ap-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+.ap-row-actions form { margin: 0; }
+
+/* ---------- Professores pendentes ---------- */
+.ap-teacher-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); min-width: 0; }
+.ap-person { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.ap-person > div { min-width: 0; }
+.ap-person strong { overflow-wrap: anywhere; }
+.ap-teacher-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 2px dashed var(--color-border);
+}
+.ap-teacher-actions form { margin: 0; }
+
+/* ---------- Matérias ---------- */
+.ap-subject-top { display: flex; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.ap-subject-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: var(--color-background);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+.ap-subject-name { font-size: var(--font-size-lg); font-weight: 800; line-height: 1.2; }
+.ap-subject-desc { min-height: 3.6em; font-size: var(--font-size-sm); opacity: 0.85; }
+.ap-subject-desc.is-empty { font-style: italic; opacity: 0.55; }
+.ap-manage-actions { display: grid; gap: var(--space-2); padding-top: var(--space-3); border-top: 2px dashed var(--color-border); }
+.ap-manage-actions form { margin: 0; }
+
+/* ---------- Usuários (admin-users) ---------- */
+.ap-user { min-width: 0; }
+.ap-user-details > summary,
+.ap-user-static {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+.ap-user-static {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-style: dashed;
+  border-radius: var(--radius);
+}
+.ap-user-id { display: grid; min-width: 0; }
+.ap-user-id strong { font-weight: 800; }
+.ap-user-id small { font-size: 13px; opacity: 0.75; }
+.ap-user-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.ap-user-manage { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-sm); font-weight: 800; white-space: nowrap; }
+.ap-user-details > summary .ui-chevron { margin: 0 4px 3px 4px; }
+.ap-user-details.is-open > summary .ui-chevron { margin-bottom: -3px; }
+.ap-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.ap-manage-box {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.ap-manage-box h4 { font-size: var(--font-size-base); font-weight: 800; }
+.ap-facts { display: grid; gap: 4px; font-size: var(--font-size-sm); }
+.ap-facts div { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.ap-facts dt { font-weight: 800; }
+.ap-facts dd { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Auditoria ---------- */
+.ap-log {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-left-width: 8px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.ap-log-time { font-size: 14px; font-weight: 700; }
+.ap-log-time small { display: block; font-weight: 400; opacity: 0.7; }
+.ap-log-body { display: grid; gap: 6px; min-width: 0; }
+.ap-log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-width: 0; }
+.ap-log-diff { padding: 6px 10px; font-size: 14px; background: var(--color-background); border: 2px dashed var(--color-secondary); border-radius: var(--radius); overflow-wrap: anywhere; }
+.ap-log-reason { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+.ap-log-ip { font-size: 12px; opacity: 0.6; }
+
+/* ---------- Paginação ---------- */
+.ap-pager { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: center; margin-top: var(--space-2); }
+.ap-page {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  font-weight: 800;
+  text-decoration: none;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+a.ap-page:hover { background: var(--color-secondary); }
+.ap-page.is-active { color: var(--color-on-primary); background: var(--color-primary); }
+
+/* ---------- Avatares (substitui o que vinha do staff.css) ---------- */
+.avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-sm { width: 32px; height: 32px; font-size: 13px; }
+.avatar-lg { width: 60px; height: 60px; font-size: 20px; }
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 960px) {
+  .ap-shell { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+  .ap-nav {
+    top: 76px;
+    z-index: 20;
+    display: flex;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    overflow-x: auto;
+  }
+  .ap-nav-item { flex: 0 0 auto; width: auto; border-color: var(--color-border); }
+  .ap-nav-item:hover { transform: none; }
+  .ap-nav-sep { display: none; }
+}
+
+@media (max-width: 720px) {
+  .ap-hero { padding: calc(var(--space-3) + 10px) var(--space-3) var(--space-3); }
+  .ap-title { font-size: var(--font-size-xl); }
+  .ap-row { grid-template-columns: minmax(0, 1fr); }
+  .ap-row-actions { justify-content: flex-start; }
+  .ap-user-details > summary,
+  .ap-user-static { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .ap-user-chips { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+  .ap-user-manage span:first-child { display: none; }
+  .ap-log { grid-template-columns: minmax(0, 1fr); }
+  .ap-result-count { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-panel.is-entering,
+  .ap-live-dot { animation: none; }
+}

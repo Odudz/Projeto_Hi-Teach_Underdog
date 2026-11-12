@@ -359,22 +359,35 @@
 			tags.forEach((tag) => data.append("specializations[]", tag));
 			proofs.forEach(({ file }) => data.append("validation_proof[]", file, file.name));
 		}
+		// Use URL-encoded data whenever no binary file is attached. The host currently
+		// returns 403 for multipart/form-data; genuine proof uploads still require multipart.
+		const hasProofFiles = isTeacher && proofs.length > 0;
+		const requestBody = hasProofFiles ? data : new URLSearchParams(data);
 
 		busy = true;
 		submitButton.disabled = true;
 		submitButton.textContent = "Cadastrando…";
 		let redirecting = false;
 		try {
-			const response = await fetch(form.action, {
+			const action = new URL(form.action, location.href);
+			action.searchParams.set("ajax", "1");
+			const response = await fetch(action, {
 				method: "POST",
-				headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-				body: data,
+				headers: { Accept: "application/json" },
+				body: requestBody,
 			});
-			let result;
+			const responseText = await response.text();
+			let result = null;
 			try {
-				result = await response.json();
+				result = JSON.parse(responseText);
 			} catch {
-				throw new Error("O servidor respondeu de forma inesperada. Tente novamente.");
+				if (response.status === 403 && hasProofFiles) {
+					throw new Error("A hospedagem recusou o envio dos comprovantes (HTTP 403/OpenResty). O servidor web não devolveu uma resposta do Hi Teach. Os comprovantes exigem multipart/form-data, que está sendo recusado; esse cadastro com arquivos só poderá concluir quando a InfinityFree liberar/corrigir esse tipo de requisição ou em uma hospedagem compatível.");
+				}
+				if (response.status === 403) {
+					throw new Error("A hospedagem recusou o cadastro (HTTP 403/OpenResty) antes de devolver uma resposta do Hi Teach. Isso não parece ser uma validação do formulário.");
+				}
+				throw new Error(`O servidor respondeu com HTTP ${response.status}, mas não retornou JSON válido.`);
 			}
 			if (result.ok) {
 				redirecting = true;

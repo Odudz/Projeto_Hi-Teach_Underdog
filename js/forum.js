@@ -227,14 +227,24 @@
 	const messages = [];
 
 	const parseResponse = async (response) => {
+		const responseText = await response.text();
 		let data = null;
-		try {
-			data = await response.json();
-		} catch {
-			throw new Error("O servidor respondeu de forma inesperada. Tente novamente.");
+		try { data = JSON.parse(responseText); } catch { /* OpenResty pode devolver HTML. */ }
+		if (!response.ok || !data?.ok) {
+			const fallback = response.status === 403
+				? "A hospedagem recusou esta operação (HTTP 403/OpenResty). A resposta não veio do Hi Teach."
+				: `Não foi possível concluir a ação (HTTP ${response.status}).`;
+			throw new Error(data?.error || fallback);
 		}
-		if (!response.ok || !data?.ok) throw new Error(data?.error || "Não foi possível concluir a ação.");
 		return data;
+	};
+
+	const urlEncoded = (formData) => {
+		const params = new URLSearchParams();
+		for (const [key, value] of formData.entries()) {
+			if (typeof value === "string") params.append(key, value);
+		}
+		return params;
 	};
 
 	const send = async (url, body) => {
@@ -332,8 +342,10 @@
 			submitButton.classList.add("is-sending");
 			submitButton.textContent = "Enviando…";
 			try {
-				const body = new FormData(replyForm);
-				body.set("body", value);
+				const formData = new FormData(replyForm);
+				formData.set("body", value);
+				// Texto sem anexos usa URL-encoded; multipart só é necessário quando há arquivo real.
+				const body = files?.files.length ? formData : urlEncoded(formData);
 				const data = await send(replyForm.getAttribute("action") || endpoint, body);
 				const holder = document.createElement("template");
 				holder.innerHTML = data.html.trim();
@@ -415,7 +427,7 @@
 			const button = form.querySelector("button");
 			if (button) button.disabled = true;
 			try {
-				await send(form.getAttribute("action") || endpoint, new FormData(form));
+				await send(form.getAttribute("action") || endpoint, urlEncoded(new FormData(form)));
 				bumpReplies(-1);
 				removeMessage(item);
 			} catch (failure) {
@@ -519,11 +531,11 @@
 			save.disabled = true;
 			save.textContent = "Salvando…";
 			try {
-				const body = new FormData();
-				body.append("action", "edit_post");
-				body.append("post_id", item.dataset.postId);
-				body.append("body", value);
-				body.append("csrf_token", csrf);
+				const body = new URLSearchParams();
+				body.set("action", "edit_post");
+				body.set("post_id", item.dataset.postId);
+				body.set("body", value);
+				body.set("csrf_token", csrf);
 				const data = await send(endpoint, body);
 				text.textContent = data.body;
 				const mark = item.querySelector("[data-edited]");

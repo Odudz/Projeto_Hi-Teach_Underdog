@@ -25,7 +25,6 @@ $studentCanCreateForum = $user && $user['role'] === 'student' && $studentForumCo
 $canCreateForum = $user && (
     in_array($user['role'], ['teacher', 'admin'], true) || $studentCanCreateForum
 );
-$canUploadForumFiles = $user && in_array($user['role'], ['teacher', 'admin'], true);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$user) {
@@ -88,13 +87,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ->execute([$newSubject, $user['id'], $newTitle, $newBody]);
             $topicId = (int) $pdo->lastInsertId();
 
-            if (!empty($_FILES['attachments']['name'][0])) {
-                if (!$canUploadForumFiles) {
-                    throw new RuntimeException('Apenas professores aprovados e administradores podem enviar anexos no fórum.');
-                }
-                saveForumAttachments($_FILES['attachments'], $topicId, null, $pdo);
-            }
-
             $pdo->commit();
             setFlash('success', 'Fórum criado!');
             redirect('forum-topic.php?id=' . $topicId);
@@ -103,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->rollBack();
             }
             error_log('forum.php:create_topic_failed: ' . $e->getMessage());
-            setFlash('error', 'Não foi possível criar o fórum com os anexos informados.');
+            setFlash('error', 'Não foi possível criar o fórum. Tente novamente.');
         }
     }
 }
@@ -209,7 +201,7 @@ if ($canCreateForum) {
       <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
     </header>
     <div class="forum-new-grid">
-      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="multipart/form-data">
+      <form id="forum-new-form" class="form" action="forum.php" method="post" enctype="application/x-www-form-urlencoded">
         <?= csrfInput() ?>
         <div class="form-group">
           <label class="form-label" for="new-subject">Matéria</label>
@@ -236,14 +228,6 @@ if ($canCreateForum) {
           </div>
           <textarea id="new-body" name="body" class="form-input forum-new-body" rows="5" maxlength="<?= FORUM_BODY_MAX ?>" required><?= e($newBody) ?></textarea>
         </div>
-
-        <?php if ($canUploadForumFiles): ?>
-          <div class="form-group">
-            <label class="form-label" for="new-attachments">Anexos</label>
-            <input type="file" id="new-attachments" name="attachments[]" class="form-input" multiple
-                   accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip">
-          </div>
-        <?php endif; ?>
 
         <button type="submit" id="forum-new-form-submit" class="button button-primary">Publicar fórum</button>
       </form>

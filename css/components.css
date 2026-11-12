@@ -157,7 +157,6 @@
 .form-label {
   font-weight: 700;
 }
-
 .form-input {
   padding: var(--space-2) var(--space-3);
   background: var(--color-background);
@@ -170,6 +169,7 @@
     transform var(--duration-base) var(--ease-out),
     box-shadow var(--duration-base) var(--ease-out);
 }
+
 .form-input:hover,
 .form-input:focus {
   outline: none;
@@ -211,7 +211,6 @@ textarea.form-input {
   transform: translate(2px, 2px);
   box-shadow: var(--shadow-md);
 }
-
 .form-note {
   margin-top: 0;
 }

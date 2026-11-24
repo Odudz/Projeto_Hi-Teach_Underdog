@@ -420,6 +420,7 @@ $fileIssues = [];
 $generalError = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireCsrf('register.php');
     $old = $_POST;
 
     $data = [
@@ -571,6 +572,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
 
         <form id="register-form" class="form" action="register.php" method="post" enctype="multipart/form-data"
             novalidate>
+            <?= csrfInput() ?>
             <div class="form-group" data-field="name">
                 <label class="form-label" for="name">Nome</label>
                 <input type="text" id="name" name="name" class="form-input" maxlength="50"

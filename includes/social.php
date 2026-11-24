@@ -27,10 +27,12 @@ const PRESENCE_STATUSES = [
  */
 function socialEnsureSchema(PDO $pdo): void
 {
-    if (!empty($_SESSION['social_schema_v2'])) {
-        return;
-    }
     try {
+        $dbName = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if ($dbName !== '' && ($_SESSION['social_schema_v2'] ?? '') === $dbName) {
+            return;
+        }
+
         $present = (int) $pdo->query(
             "SELECT COUNT(*) FROM information_schema.TABLES
              WHERE TABLE_SCHEMA = DATABASE()
@@ -129,7 +131,9 @@ function socialEnsureSchema(PDO $pdo): void
                 );
             }
         }
-        $_SESSION['social_schema_v2'] = true;
+        if ($dbName !== '') {
+            $_SESSION['social_schema_v2'] = $dbName;
+        }
     } catch (Throwable $error) {
         error_log('social.php:schema_failed: ' . $error->getMessage());
     }
@@ -139,7 +143,6 @@ function socialEnsureSchema(PDO $pdo): void
 
 function socialTouchPresence(PDO $pdo, int $userId): void
 {
-    // Invisível não atualiza "visto por último": senão o horário entregaria que a pessoa está aqui.
     $pdo->prepare(
         "INSERT INTO user_presence (user_id, status, last_seen_at) VALUES (?, 'online', NOW())
          ON DUPLICATE KEY UPDATE last_seen_at = IF(status = 'invisible', last_seen_at, NOW())"
@@ -167,10 +170,6 @@ function socialOwnStatus(PDO $pdo, int $userId): string
     return is_string($status) && isset(PRESENCE_STATUSES[$status]) ? $status : 'online';
 }
 
-/**
- * Como os amigos enxergam alguém. $row precisa de presence_status, seen_age (segundos desde o último ping).
- * Retorna key (online|busy|away|offline), label e o texto "visto por último".
- */
 function socialPresenceView(array $row): array
 {
     $status = $row['presence_status'] ?? null;
@@ -190,7 +189,6 @@ function socialLastSeenText(?int $age): string
     if ($age === null) {
         return 'Ainda não ficou online';
     }
-    // Usa a idade em segundos (calculada no banco) para não depender de fuso horário.
     $moment = time() - $age;
     $time = date('H:i', $moment);
     $day = date('Y-m-d', $moment);
@@ -217,17 +215,19 @@ function socialStatusPicker(string $current, string $returnTo): string
 {
     $icons = ['online' => 'Online', 'busy' => 'Ocupado', 'away' => 'Ausente', 'invisible' => 'Invisível'];
     ob_start();
-    ?>
-    <form class="status-picker" method="post" action="<?= e(socialBase()) ?>endpoints/presence.php" data-status-picker role="group" aria-label="Meu status">
-      <?= csrfInput() ?>
-      <input type="hidden" name="return" value="<?= e($returnTo) ?>">
-      <?php foreach ($icons as $key => $label): ?>
-        <button type="submit" name="status" value="<?= e($key) ?>" class="status-option status-<?= e($key) ?>" aria-pressed="<?= $current === $key ? 'true' : 'false' ?>" data-status="<?= e($key) ?>">
-          <span class="presence-dot" aria-hidden="true"></span><?= e($label) ?>
-        </button>
-      <?php endforeach; ?>
+?>
+    <form class="status-picker" method="post" action="<?= e(socialBase()) ?>endpoints/presence.php" data-status-picker
+        role="group" aria-label="Meu status">
+        <?= csrfInput() ?>
+        <input type="hidden" name="return" value="<?= e($returnTo) ?>">
+        <?php foreach ($icons as $key => $label): ?>
+            <button type="submit" name="status" value="<?= e($key) ?>" class="status-option status-<?= e($key) ?>"
+                aria-pressed="<?= $current === $key ? 'true' : 'false' ?>" data-status="<?= e($key) ?>">
+                <span class="presence-dot" aria-hidden="true"></span><?= e($label) ?>
+            </button>
+        <?php endforeach; ?>
     </form>
-    <?php
+<?php
     return (string) ob_get_clean();
 }
 
@@ -264,10 +264,6 @@ function socialAreFriends(PDO $pdo, int $a, int $b): bool
     return (bool) $stmt->fetchColumn();
 }
 
-/**
- * Estado entre $me e $other: self | friends | sent | received | blocked_by_me | blocked_me | none
- * (blocked_me existe só para esconder opções; a interface nunca diz à pessoa que foi bloqueada.)
- */
 function socialRelation(PDO $pdo, int $me, int $other): string
 {
     if ($me === $other) {
@@ -295,7 +291,6 @@ function socialRelation(PDO $pdo, int $me, int $other): string
     return (int) $row['requested_by'] === $me ? 'sent' : 'received';
 }
 
-/** @return array{0: bool, 1: string} [sucesso, mensagem] */
 function socialSendRequest(PDO $pdo, int $me, int $target): array
 {
     $generic = [false, 'Não foi possível enviar o pedido de amizade.'];
@@ -320,7 +315,6 @@ function socialSendRequest(PDO $pdo, int $me, int $target): array
         return [false, 'Você já enviou um pedido para esta pessoa.'];
     }
     if ($relation === 'received') {
-        // Os dois quiseram ao mesmo tempo: vira amizade.
         return socialRespond($pdo, $me, $target, true);
     }
 
@@ -437,9 +431,6 @@ function socialCountFriends(PDO $pdo, int $me): int
 
 /* ----------------------------------------------------------------- listas */
 
-/**
- * Amigos com presença, não lidas e última mensagem. Só amigos ativos e sem bloqueio.
- */
 function socialFriends(PDO $pdo, int $me): array
 {
     $stmt = $pdo->prepare(
@@ -460,13 +451,18 @@ function socialFriends(PDO $pdo, int $me): array
          ORDER BY u.name"
     );
     $stmt->execute([
-        'me1' => $me, 'me2' => $me, 'me3' => $me, 'me4' => $me,
-        'me5' => $me, 'me6' => $me, 'me7' => $me, 'me8' => $me,
+        'me1' => $me,
+        'me2' => $me,
+        'me3' => $me,
+        'me4' => $me,
+        'me5' => $me,
+        'me6' => $me,
+        'me7' => $me,
+        'me8' => $me,
     ]);
     return $stmt->fetchAll();
 }
 
-/** Pedidos recebidos ($incoming = true) ou enviados. */
 function socialRequests(PDO $pdo, int $me, bool $incoming): array
 {
     $stmt = $pdo->prepare(
@@ -494,7 +490,6 @@ function socialBlockedUsers(PDO $pdo, int $me): array
     return $stmt->fetchAll();
 }
 
-/** Números do balão vermelho do cabeçalho. */
 function socialBadgeCounts(PDO $pdo, int $me): array
 {
     $stmt = $pdo->prepare(
@@ -541,7 +536,12 @@ function socialBadgeCounts(PDO $pdo, int $me): array
 
 function socialRoleLabel(string $role): string
 {
-    return ['student' => 'Aluno', 'teacher' => 'Professor', 'admin' => 'Administrador'][$role] ?? 'Usuário';
+    return [
+        'student'   => 'Aluno',
+        'teacher'   => 'Professor',
+        'moderator' => 'Moderador',
+        'admin'     => 'Administrador',
+    ][$role] ?? 'Usuário';
 }
 
 function socialInitials(string $name): string
@@ -549,7 +549,6 @@ function socialInitials(string $name): string
     return mb_strtoupper(mb_substr(trim($name), 0, 1));
 }
 
-/** Avatar pequeno (imagem ou inicial) que leva ao perfil. */
 function socialAvatar(array $person, string $class = 'friend-avatar'): string
 {
     $id = (int) $person['id'];
@@ -562,10 +561,6 @@ function socialAvatar(array $person, string $class = 'friend-avatar'): string
     return $html . '</span>';
 }
 
-/**
- * Cada $return vira um destino fixo (nunca uma URL vinda do usuário).
- * 'profile' | 'contacts' | 'contacts:requests|friends|add|conversations' | 'view:ID' | 'chat:ID'
- */
 function socialReturnUrl(string $return, int $fallbackId = 0): string
 {
     if ($return === 'profile') {
@@ -612,7 +607,7 @@ function socialTagThrottled(): bool
     $now = time();
     $recent = array_values(array_filter(
         (array) ($_SESSION['tag_fails'] ?? []),
-        fn ($moment) => $now - (int) $moment < TAG_FAILS_WINDOW
+        fn($moment) => $now - (int) $moment < TAG_FAILS_WINDOW
     ));
     $_SESSION['tag_fails'] = $recent;
     return count($recent) >= TAG_FAILS_MAX;
@@ -892,7 +887,7 @@ function socialConversations(PDO $pdo, int $me): array
     $stmt->execute(array_fill(0, 12, $me));
     $rows = $stmt->fetchAll();
 
-    $ids = array_values(array_filter(array_map(fn ($row) => (int) $row['last_message_id'], $rows)));
+    $ids = array_values(array_filter(array_map(fn($row) => (int) $row['last_message_id'], $rows)));
     $last = [];
     if ($ids) {
         $marks = implode(',', array_fill(0, count($ids), '?'));

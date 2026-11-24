@@ -22,19 +22,38 @@
   --shadow-md: 4px 4px 0 var(--color-border);
   --shadow-lg: 8px 8px 0 var(--color-border);
   --radius: 10px;
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
-  --space-5: 32px;
-  --space-6: 48px;
+  /* Escalas escolhidas pelo usuário em Opções (1 = normal).
+     --text-scale aumenta só o texto; --ui-scale aumenta espaçamentos e componentes.
+     Os *-max são tetos aplicados em telas pequenas (ver @media abaixo) para
+     o layout não estourar; os valores *-eff são os que o site realmente usa. */
+  --text-scale: 1;
+  --ui-scale: 1;
+
+  /* Escala de empilhamento (z-index). Sempre usar estes tokens, nunca números soltos. */
+  --z-sticky: 20;        /* barras fixas no rolar: nav do painel, caixa de resposta */
+  --z-floating: 30;      /* botões flutuantes e cabeçalhos de conversa */
+  --z-dropdown: 60;      /* menus e painéis suspensos */
+  --z-header: 100;       /* cabeçalho do site */
+  --z-page-fx: 1000;     /* efeitos de página (decorativos) */
+  --z-modal: 2000;       /* sobreposições e diálogos (sempre por cima de tudo) */
+  --text-max: 99;
+  --ui-max: 99;
+  --text-eff: min(var(--text-scale), var(--text-max));
+  --ui-eff: min(var(--ui-scale), var(--ui-max));
+
+  --space-1: calc(4px * var(--ui-eff));
+  --space-2: calc(8px * var(--ui-eff));
+  --space-3: calc(16px * var(--ui-eff));
+  --space-4: calc(24px * var(--ui-eff));
+  --space-5: calc(32px * var(--ui-eff));
+  --space-6: calc(48px * var(--ui-eff));
   --font-family: "Baloo 2", cursive;
-  --font-size-sm: 16px;
-  --font-size-base: 18px;
-  --font-size-lg: 22px;
-  --font-size-xl: 28px;
-  --font-size-2xl: 36px;
-  --font-size-3xl: 52px;
+  --font-size-sm: calc(16px * var(--text-eff));
+  --font-size-base: calc(18px * var(--text-eff));
+  --font-size-lg: calc(22px * var(--text-eff));
+  --font-size-xl: calc(28px * var(--text-eff));
+  --font-size-2xl: calc(36px * var(--text-eff));
+  --font-size-3xl: calc(52px * var(--text-eff));
   --duration-fast: 150ms;
   --duration-base: 300ms;
   --duration-slow: 500ms;
@@ -102,6 +121,17 @@ ul {
   }
   h2 {
     font-size: var(--font-size-lg);
+  }
+  /* Celulares: limita o quanto o usuário pode ampliar, para não quebrar o layout */
+  :root {
+    --text-max: 1.2;
+    --ui-max: 1.1;
+  }
+}
+@media (max-width: 380px) {
+  :root {
+    --text-max: 1.1;
+    --ui-max: 1;
   }
 }
 

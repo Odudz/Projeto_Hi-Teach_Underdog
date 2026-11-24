@@ -29,8 +29,8 @@
 /* Indicador de "Ao Vivo" */
 .live-pulse-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: calc(10px * var(--ui-eff));
+  height: calc(10px * var(--ui-eff));
   background-color: var(--color-background);
   border-radius: 50%;
   animation: live-pulse-anim 1.5s infinite;
@@ -52,8 +52,3 @@
 }
 
 /* Opcional: Garante que os chips de perigo sobrescrevam cores para combinar com o vermelho do ao vivo */
-.chip-danger {
-  background: var(--color-danger) !important;
-  color: var(--color-on-danger) !important;
-  border-color: var(--color-danger) !important;
-}

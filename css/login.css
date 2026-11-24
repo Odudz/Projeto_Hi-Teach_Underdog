@@ -32,12 +32,12 @@
   gap: var(--space-3);
 }
 .recover-badge {
-  margin-top: 18px;
+  margin-top: calc(18px * var(--ui-eff));
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: calc(56px * var(--ui-eff));
+  height: calc(56px * var(--ui-eff));
   background: var(--color-secondary);
   color: var(--color-text);
   border: var(--border);
@@ -46,8 +46,8 @@
 }
 .recover-badge-ok {
   align-self: center;
-  width: 72px;
-  height: 72px;
+  width: calc(72px * var(--ui-eff));
+  height: calc(72px * var(--ui-eff));
   background: var(--color-primary);
   color: var(--color-on-primary);
 }

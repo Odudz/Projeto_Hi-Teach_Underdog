@@ -54,6 +54,32 @@
         <span class="switch-track"><span class="switch-stars"></span><span class="switch-clouds"></span><span class="switch-knob"></span></span>
       </label>
     </div>
+
+    <div id="settings-size" class="settings-group">
+      <h3 class="settings-group-title">Tamanho</h3>
+
+      <div class="scale-control">
+        <label class="scale-label" for="scale-text">
+          <span class="scale-name">Texto</span>
+          <output class="scale-value" id="scale-text-value" for="scale-text">100%</output>
+        </label>
+        <input type="range" id="scale-text" class="scale-slider" min="90" max="130" step="5" value="100"
+          aria-describedby="scale-text-hint">
+        <span id="scale-text-hint" class="switch-hint">Aumenta apenas as letras.</span>
+      </div>
+
+      <div class="scale-control">
+        <label class="scale-label" for="scale-ui">
+          <span class="scale-name">Interface</span>
+          <output class="scale-value" id="scale-ui-value" for="scale-ui">100%</output>
+        </label>
+        <input type="range" id="scale-ui" class="scale-slider" min="90" max="120" step="5" value="100"
+          aria-describedby="scale-ui-hint">
+        <span id="scale-ui-hint" class="switch-hint">Aumenta botões, espaçamentos e ícones.</span>
+      </div>
+
+      <button type="button" id="scale-reset" class="button button-small scale-reset">Restaurar tamanhos</button>
+    </div>
   </section>
 </div>
 

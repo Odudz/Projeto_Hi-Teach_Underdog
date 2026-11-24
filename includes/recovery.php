@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Frase recuperadora: regras, hash e limite de tentativas.
  *
@@ -136,4 +137,57 @@ function recoveryClearFailures(PDO $pdo, string $emailKey): void
 function recoveryWaitMinutes(): int
 {
     return (int) ceil(RECOVERY_WINDOW_SECONDS / 60);
+}
+
+/** Garante a coluna deactivated_by na tabela users para diferenciar desativação de usuário vs. admin. */
+function recoveryEnsureColumn(PDO $pdo): void
+{
+    try {
+        $dbName = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if ($dbName !== '' && ($_SESSION['recovery_col_checked'] ?? '') === $dbName) {
+            return;
+        }
+
+        $exists = (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = 'users'
+               AND COLUMN_NAME = 'deactivated_by'"
+        )->fetchColumn();
+
+        if ($exists === 0) {
+            $pdo->exec(
+                "ALTER TABLE users
+                 ADD COLUMN deactivated_by ENUM('user', 'admin') NULL DEFAULT NULL AFTER activate"
+            );
+
+            $hasAudit = (int) $pdo->query(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs'"
+            )->fetchColumn();
+
+            if ($hasAudit > 0) {
+                $pdo->exec(
+                    "UPDATE users u
+                     SET u.deactivated_by = IF(
+                         (SELECT a.action FROM audit_logs a
+                          WHERE a.target_type = 'user' AND a.target_id = u.id
+                            AND a.action IN ('USER_DEACTIVATED', 'USER_ACTIVATED')
+                          ORDER BY a.id DESC LIMIT 1) = 'USER_DEACTIVATED',
+                         'admin',
+                         'user'
+                     )
+                     WHERE u.activate = 0 AND u.deactivated_by IS NULL"
+                );
+            } else {
+                $pdo->exec("UPDATE users SET deactivated_by = 'user' WHERE activate = 0 AND deactivated_by IS NULL");
+            }
+        }
+
+        if ($dbName !== '') {
+            $_SESSION['recovery_col_checked'] = $dbName;
+        }
+    } catch (Throwable $e) {
+        error_log('recoveryEnsureColumn: ' . $e->getMessage());
+    }
 }

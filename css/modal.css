@@ -1,7 +1,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,13 +58,13 @@
   font-size: var(--font-size-xl);
 }
 .modal-close {
-  width: 36px;
-  height: 36px;
+  width: calc(36px * var(--ui-eff));
+  height: calc(36px * var(--ui-eff));
   background: var(--color-background);
   color: var(--color-text);
   border: var(--border);
   border-radius: 50%;
-  font-size: 24px;
+  font-size: calc(24px * var(--text-eff));
   line-height: 1;
   cursor: pointer;
   box-shadow: var(--shadow-sm);
@@ -99,30 +99,10 @@
   resize: none;
 }
 
-.profile-bio {
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-  max-height: 200px;
-  margin: var(--space-3) 0;
-  font-size: var(--font-size-lg);
-  font-style: italic;
-  line-height: 1.7;
-}
-
-.profile-bio-clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: pre-line;
-  margin-bottom: var(--space-1, 4px);
-}
-
 .bio-full-content {
   white-space: pre-line;
   word-break: break-word;
-  padding-top: var(--space-3, 16px);
+  padding-top: var(--space-3, calc(16px * var(--ui-eff)));
   line-height: 1.6;
   max-height: 60vh;
   overflow-y: auto;

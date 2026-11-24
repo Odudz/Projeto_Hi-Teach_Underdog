@@ -86,4 +86,56 @@
 			save("hiteach-motion", motionInput.checked ? "reduced" : null);
 		});
 	}
+	/* ---------- Tamanho do texto e da interface ---------- */
+	const scaleControls = [
+		{
+			input: "scale-text",
+			output: "scale-text-value",
+			cssVar: "--text-scale",
+			key: "hiteach-text-scale",
+			min: 90,
+			max: 130,
+		},
+		{
+			input: "scale-ui",
+			output: "scale-ui-value",
+			cssVar: "--ui-scale",
+			key: "hiteach-ui-scale",
+			min: 90,
+			max: 120,
+		},
+	];
+	const resetButton = document.getElementById("scale-reset");
+
+	const readScale = (control) => {
+		try {
+			const percent = parseInt(localStorage.getItem(control.key), 10);
+			if (Number.isInteger(percent) && percent >= control.min && percent <= control.max)
+				return percent;
+		} catch (error) {}
+		return 100;
+	};
+
+	const applyScale = (control, percent) => {
+		const slider = document.getElementById(control.input);
+		const output = document.getElementById(control.output);
+		if (slider) slider.value = String(percent);
+		if (output) output.textContent = percent + "%";
+		root.style.setProperty(control.cssVar, String(percent / 100));
+		save(control.key, percent === 100 ? null : String(percent));
+	};
+
+	scaleControls.forEach((control) => {
+		const slider = document.getElementById(control.input);
+		if (!slider) return;
+		applyScale(control, readScale(control));
+		// "input" atualiza enquanto arrasta; a escala é aplicada na hora.
+		slider.addEventListener("input", () => applyScale(control, Number(slider.value)));
+	});
+
+	if (resetButton) {
+		resetButton.addEventListener("click", () => {
+			scaleControls.forEach((control) => applyScale(control, 100));
+		});
+	}
 })();

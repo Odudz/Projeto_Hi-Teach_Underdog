@@ -44,6 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $pdo->prepare('INSERT INTO subjects (name, description) VALUES (?, ?)');
                 $stmt->execute([$name, $description !== '' ? $description : null]);
+                $subId = (int) $pdo->lastInsertId();
+                rbacAudit($pdo, (int) $user['id'], 'SUBJECT_CREATED', 'subject', $subId, null, ['name' => $name], 'Matéria cadastrada no painel');
                 setFlash('success', "Matéria \"{$name}\" cadastrada com sucesso!");
             } catch (PDOException $e) {
                 if ($e->getCode() === '23000') {
@@ -71,8 +73,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('error', 'Dados inválidos: o nome deve ter de 2 a 60 e a descrição até 250 caracteres.');
         } else {
             try {
+                $stmtOld = $pdo->prepare('SELECT name FROM subjects WHERE id = ?');
+                $stmtOld->execute([$subjectId]);
+                $oldName = $stmtOld->fetchColumn();
+
                 $stmt = $pdo->prepare('UPDATE subjects SET name = ?, description = ? WHERE id = ?');
                 $stmt->execute([$name, $description !== '' ? $description : null, $subjectId]);
+                rbacAudit($pdo, (int) $user['id'], 'SUBJECT_UPDATED', 'subject', $subjectId, ['name' => $oldName], ['name' => $name], 'Matéria atualizada no painel');
                 setFlash('success', 'Matéria atualizada com sucesso!');
             } catch (PDOException $e) {
                 setFlash('error', 'Já existe outra matéria com esse nome.');
@@ -102,7 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($countTopics > 0 || $countCourses > 0) {
                 setFlash('error', "Não é possível excluir: existem {$countCourses} curso(s) e {$countTopics} fórum(ns) vinculados.");
             } else {
+                $stmtOld = $pdo->prepare('SELECT name FROM subjects WHERE id = ?');
+                $stmtOld->execute([$subjectId]);
+                $oldName = $stmtOld->fetchColumn();
+
                 $pdo->prepare('DELETE FROM subjects WHERE id = ?')->execute([$subjectId]);
+                rbacAudit($pdo, (int) $user['id'], 'SUBJECT_DELETED', 'subject', $subjectId, ['name' => $oldName], null, 'Matéria excluída no painel');
                 setFlash('success', 'Matéria excluída com sucesso.');
             }
         }
@@ -113,11 +125,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($modAction === 'delete_course') {
         $courseId = (int) ($_POST['course_id'] ?? 0);
         if ($courseId > 0) {
+            $stmtOld = $pdo->prepare('SELECT title FROM courses WHERE id = ?');
+            $stmtOld->execute([$courseId]);
+            $oldTitle = $stmtOld->fetchColumn();
+
             $stmt = $pdo->prepare('SELECT stored_name FROM course_materials WHERE course_id = ?');
             $stmt->execute([$courseId]);
             $files = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-            $pdo->prepare('DELETE FROM courses WHERE id = ?')->execute([$courseId]);
+            $deleteCourse = $pdo->prepare('DELETE FROM courses WHERE id = ?');
+            $deleteCourse->execute([$courseId]);
+            $courseRemoved = $deleteCourse->rowCount() > 0;
+
+            if ($courseRemoved) {
+                rbacAudit($pdo, (int) $user['id'], 'COURSE_DELETED', 'course', $courseId, ['title' => $oldTitle], null, 'Curso excluído no painel');
+            }
 
             foreach ($files as $name) {
                 $path = __DIR__ . '/../storage/private/materials/' . $name;
@@ -125,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @unlink($path);
                 }
             }
-            setFlash('success', 'Curso removido da plataforma.');
+            setFlash($courseRemoved ? 'success' : 'error', $courseRemoved ? 'Curso removido da plataforma.' : 'Curso não encontrado.');
         }
         redirect('moderator-dashboard.php#mod-courses');
     }
@@ -147,10 +169,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $target = 'subjects.php' . ($params ? '?' . http_build_query($params) : '') . '#course-list';
         }
         if ($courseId > 0) {
+            $stmtOld = $pdo->prepare('SELECT title, is_published FROM courses WHERE id = ?');
+            $stmtOld->execute([$courseId]);
+            $oldCourse = $stmtOld->fetch();
+
             $stmt = $pdo->prepare('UPDATE courses SET is_published = 1 - is_published WHERE id = ?');
             $stmt->execute([$courseId]);
-            setFlash($stmt->rowCount() > 0 ? 'success' : 'error',
-                $stmt->rowCount() > 0 ? 'Status de publicação do curso atualizado.' : 'Curso não encontrado.');
+            if ($stmt->rowCount() > 0 && $oldCourse) {
+                $newPub = 1 - (int) $oldCourse['is_published'];
+                rbacAudit(
+                    $pdo,
+                    (int) $user['id'],
+                    $newPub ? 'COURSE_PUBLISHED' : 'COURSE_UNPUBLISHED',
+                    'course',
+                    $courseId,
+                    ['title' => $oldCourse['title'], 'published' => (int) $oldCourse['is_published']],
+                    ['published' => $newPub],
+                    'Status de publicação alterado'
+                );
+            }
+            setFlash(
+                $stmt->rowCount() > 0 ? 'success' : 'error',
+                $stmt->rowCount() > 0 ? 'Status de publicação do curso atualizado.' : 'Curso não encontrado.'
+            );
         }
         redirect($target);
     }
@@ -158,13 +199,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 5. Excluir Tópico do Fórum
     if (isset($_POST['forum_topic_id'])) {
         $topicToDelete = (int) $_POST['forum_topic_id'];
+        $stmtOld = $pdo->prepare('SELECT title FROM forum_topics WHERE id = ?');
+        $stmtOld->execute([$topicToDelete]);
+        $oldTitle = $stmtOld->fetchColumn();
+
         $stmtFiles = $pdo->prepare('SELECT stored_name FROM forum_attachments WHERE topic_id = ?');
         $stmtFiles->execute([$topicToDelete]);
         $storedNames = $stmtFiles->fetchAll(PDO::FETCH_COLUMN);
 
-        $pdo->prepare('DELETE FROM forum_topics WHERE id = ?')->execute([$topicToDelete]);
-        forumCleanupFiles($storedNames);
-        setFlash('success', 'Tópico excluído com sucesso.');
+        $deleteTopic = $pdo->prepare('DELETE FROM forum_topics WHERE id = ?');
+        $deleteTopic->execute([$topicToDelete]);
+        if ($deleteTopic->rowCount() > 0) {
+            rbacAudit($pdo, (int) $user['id'], 'TOPIC_DELETED', 'topic', $topicToDelete, ['title' => $oldTitle], null, 'Tópico excluído no painel');
+            forumCleanupFiles($storedNames);
+            setFlash('success', 'Tópico excluído com sucesso.');
+        } else {
+            setFlash('error', 'Tópico não encontrado.');
+        }
         redirect('moderator-dashboard.php#mod-forums');
     }
 
@@ -181,11 +232,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("UPDATE teacher_profiles SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE user_id = ? AND status = 'pending'");
         $stmt->execute([$decision === 'approve' ? 'approved' : 'rejected', $user['id'], $teacherId]);
 
-        if ($stmt->rowCount() > 0 && $decision === 'approve') {
-            $pdo->prepare("UPDATE users SET role = 'teacher' WHERE id = ? AND role = 'student'")->execute([$teacherId]);
-            setFlash('success', 'Professor aprovado com sucesso!');
+        if ($stmt->rowCount() > 0) {
+            if ($decision === 'approve') {
+                $pdo->prepare("UPDATE users SET role = 'teacher' WHERE id = ? AND role = 'student'")->execute([$teacherId]);
+            }
+            rbacAudit(
+                $pdo,
+                (int) $user['id'],
+                $decision === 'approve' ? 'TEACHER_APPROVED' : 'TEACHER_REJECTED',
+                'user',
+                $teacherId,
+                ['status' => 'pending'],
+                ['status' => $decision === 'approve' ? 'approved' : 'rejected'],
+                'Revisão de cadastro de professor'
+            );
+            setFlash('success', $decision === 'approve' ? 'Professor aprovado com sucesso!' : 'Solicitação de professor recusada.');
         } else {
-            setFlash('success', 'Solicitação de professor recusada.');
+            setFlash('error', 'Esta solicitação já havia sido analisada.');
         }
         redirect('moderator-dashboard.php#pending-teachers');
     }
@@ -322,7 +385,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <a class="button button-small" href="admin-users.php"><?= uiIcon('users', 16) ?>Usuários e cargos</a>
             <?php endif; ?>
             <a class="button button-small" href="moderation.php"><?= uiIcon('shield', 16) ?>Fila de moderação</a>
-            <a class="button button-small button-primary" href="subjects.php"><?= uiIcon('book', 16) ?>Ver matérias no site</a>
+            <a class="button button-small button-primary" href="subjects.php"><?= uiIcon('book', 16) ?>Ver matérias no
+                site</a>
         </div>
     </header>
 
@@ -368,38 +432,46 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                             <ul class="ap-todo">
                                 <li class="ap-todo-item is-ok">
                                     <?= uiIcon('check', 20) ?>
-                                    <span class="ap-todo-text"><strong>Tudo em dia</strong><small>Nenhuma pendência no momento.</small></span>
+                                    <span class="ap-todo-text"><strong>Tudo em dia</strong><small>Nenhuma pendência no
+                                            momento.</small></span>
                                 </li>
                             </ul>
                         <?php else: ?>
                             <ul class="ap-todo">
                                 <?php if ($pendingCount): ?>
                                     <li><a class="ap-todo-item" href="#pending-teachers">
-                                        <?= uiIcon('teacher', 20) ?>
-                                        <span class="ap-todo-text"><strong><?= $pendingCount ?> <?= $pendingCount === 1 ? 'professor aguardando' : 'professores aguardando' ?></strong><small><?= $isAdmin ? 'Revise os comprovantes e aprove ou recuse.' : 'A aprovação final é feita por um administrador.' ?></small></span>
-                                        <span class="chip chip-danger"><?= $pendingCount ?></span>
-                                    </a></li>
+                                            <?= uiIcon('teacher', 20) ?>
+                                            <span class="ap-todo-text"><strong><?= $pendingCount ?>
+                                                    <?= $pendingCount === 1 ? 'professor aguardando' : 'professores aguardando' ?></strong><small><?= $isAdmin ? 'Revise os comprovantes e aprove ou recuse.' : 'A aprovação final é feita por um administrador.' ?></small></span>
+                                            <span class="chip chip-danger"><?= $pendingCount ?></span>
+                                        </a></li>
                                 <?php endif; ?>
                                 <?php if ($draftCourses): ?>
                                     <li><a class="ap-todo-item" href="#mod-courses">
-                                        <?= uiIcon('course', 20) ?>
-                                        <span class="ap-todo-text"><strong><?= count($draftCourses) ?> <?= count($draftCourses) === 1 ? 'curso em rascunho' : 'cursos em rascunho' ?></strong><small>Ainda não aparecem para os alunos.</small></span>
-                                        <span class="chip"><?= count($draftCourses) ?></span>
-                                    </a></li>
+                                            <?= uiIcon('course', 20) ?>
+                                            <span class="ap-todo-text"><strong><?= count($draftCourses) ?>
+                                                    <?= count($draftCourses) === 1 ? 'curso em rascunho' : 'cursos em rascunho' ?></strong><small>Ainda
+                                                    não aparecem para os alunos.</small></span>
+                                            <span class="chip"><?= count($draftCourses) ?></span>
+                                        </a></li>
                                 <?php endif; ?>
                                 <?php if ($emptyCourses): ?>
                                     <li><a class="ap-todo-item" href="#mod-courses">
-                                        <?= uiIcon('eye', 20) ?>
-                                        <span class="ap-todo-text"><strong><?= count($emptyCourses) ?> <?= count($emptyCourses) === 1 ? 'curso sem aulas' : 'cursos sem aulas' ?></strong><small>Cursos vazios podem confundir os alunos.</small></span>
-                                        <span class="chip"><?= count($emptyCourses) ?></span>
-                                    </a></li>
+                                            <?= uiIcon('eye', 20) ?>
+                                            <span class="ap-todo-text"><strong><?= count($emptyCourses) ?>
+                                                    <?= count($emptyCourses) === 1 ? 'curso sem aulas' : 'cursos sem aulas' ?></strong><small>Cursos
+                                                    vazios podem confundir os alunos.</small></span>
+                                            <span class="chip"><?= count($emptyCourses) ?></span>
+                                        </a></li>
                                 <?php endif; ?>
                                 <?php if ($idleSubjects): ?>
                                     <li><a class="ap-todo-item" href="#mod-subjects">
-                                        <?= uiIcon('book', 20) ?>
-                                        <span class="ap-todo-text"><strong><?= count($idleSubjects) ?> <?= count($idleSubjects) === 1 ? 'matéria sem conteúdo' : 'matérias sem conteúdo' ?></strong><small>Sem cursos nem fóruns vinculados.</small></span>
-                                        <span class="chip"><?= count($idleSubjects) ?></span>
-                                    </a></li>
+                                            <?= uiIcon('book', 20) ?>
+                                            <span class="ap-todo-text"><strong><?= count($idleSubjects) ?>
+                                                    <?= count($idleSubjects) === 1 ? 'matéria sem conteúdo' : 'matérias sem conteúdo' ?></strong><small>Sem
+                                                    cursos nem fóruns vinculados.</small></span>
+                                            <span class="chip"><?= count($idleSubjects) ?></span>
+                                        </a></li>
                                 <?php endif; ?>
                             </ul>
                         <?php endif; ?>
@@ -407,20 +479,23 @@ include_once __DIR__ . '/../includes/cabecalho.php';
 
                     <!-- Aulas ao vivo -->
                     <section class="ap-card" aria-labelledby="ap-live-title">
-                        <h3 class="ap-card-title" id="ap-live-title"><?= uiIcon('live', 20) ?>Ao vivo agora <span class="chip<?= $lives ? ' chip-danger' : '' ?>"><?= count($lives) ?></span></h3>
+                        <h3 class="ap-card-title" id="ap-live-title"><?= uiIcon('live', 20) ?>Ao vivo agora <span
+                                class="chip<?= $lives ? ' chip-danger' : '' ?>"><?= count($lives) ?></span></h3>
                         <?php if (!$lives): ?>
                             <p class="ap-muted">Nenhuma transmissão no ar neste momento.</p>
                         <?php else: ?>
                             <ul class="ap-list">
                                 <?php foreach ($lives as $live): ?>
                                     <li><a class="ap-live" href="live-watch.php?id=<?= (int) $live['id'] ?>">
-                                        <span class="ap-live-dot" aria-hidden="true"></span>
-                                        <span class="ap-todo-text">
-                                            <strong class="ui-clamp-1"><?= e($live['title']) ?></strong>
-                                            <small class="ui-clamp-1"><?= e($live['teacher_name']) ?><?= !empty($live['subject']) ? ' · ' . e($live['subject']) : '' ?></small>
-                                        </span>
-                                        <span class="chip chip-muted"><?= e(uiDuration((int) $live['elapsed_seconds'])) ?></span>
-                                    </a></li>
+                                            <span class="ap-live-dot" aria-hidden="true"></span>
+                                            <span class="ap-todo-text">
+                                                <strong class="ui-clamp-1"><?= e($live['title']) ?></strong>
+                                                <small
+                                                    class="ui-clamp-1"><?= e($live['teacher_name']) ?><?= !empty($live['subject']) ? ' · ' . e($live['subject']) : '' ?></small>
+                                            </span>
+                                            <span
+                                                class="chip chip-muted"><?= e(uiDuration((int) $live['elapsed_seconds'])) ?></span>
+                                        </a></li>
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>
@@ -435,12 +510,14 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                             <ul class="ap-list">
                                 <?php foreach ($recentCourses as $c): ?>
                                     <li><a class="ap-todo-item" href="course.php?id=<?= (int) $c['id'] ?>">
-                                        <span class="ap-todo-text">
-                                            <strong class="ui-clamp-1"><?= e($c['title']) ?></strong>
-                                            <small class="ui-clamp-1"><?= e($c['subject_name']) ?> · <?= e($c['teacher_name']) ?></small>
-                                        </span>
-                                        <span class="chip <?= $c['is_published'] ? 'chip-primary' : 'chip-draft' ?>"><?= $c['is_published'] ? 'Publicado' : 'Rascunho' ?></span>
-                                    </a></li>
+                                            <span class="ap-todo-text">
+                                                <strong class="ui-clamp-1"><?= e($c['title']) ?></strong>
+                                                <small class="ui-clamp-1"><?= e($c['subject_name']) ?> ·
+                                                    <?= e($c['teacher_name']) ?></small>
+                                            </span>
+                                            <span
+                                                class="chip <?= $c['is_published'] ? 'chip-primary' : 'chip-draft' ?>"><?= $c['is_published'] ? 'Publicado' : 'Rascunho' ?></span>
+                                        </a></li>
                                 <?php endforeach; ?>
                             </ul>
                         <?php endif; ?>
@@ -452,13 +529,15 @@ include_once __DIR__ . '/../includes/cabecalho.php';
             <section id="pending-teachers" class="ap-panel" data-ap-panel>
                 <div class="ap-panel-head">
                     <div>
-                        <h2 class="ap-panel-title">Professores aguardando aprovação <span class="chip<?= $pendingCount ? ' chip-danger' : '' ?>"><?= $pendingCount ?></span></h2>
+                        <h2 class="ap-panel-title">Professores aguardando aprovação <span
+                                class="chip<?= $pendingCount ? ' chip-danger' : '' ?>"><?= $pendingCount ?></span></h2>
                         <p class="ap-panel-sub">Confira os dados e comprovantes antes de aprovar.</p>
                     </div>
                 </div>
 
                 <?php if (!$isAdmin): ?>
-                    <div class="ui-panel ui-panel-info ui-note">Moderadores acompanham as solicitações. A aprovação ou recusa é feita por um administrador.</div>
+                    <div class="ui-panel ui-panel-info ui-note">Moderadores acompanham as solicitações. A aprovação ou
+                        recusa é feita por um administrador.</div>
                 <?php endif; ?>
 
                 <?php if (!$pending): ?>
@@ -479,10 +558,12 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                         <div>
                                             <strong class="ui-clamp-1"><?= e($teacher['name']) ?></strong>
                                             <span class="ap-id">#<?= $tid ?></span>
-                                            <div class="ap-muted ui-ellipsis" title="<?= e($teacher['email']) ?>"><?= e($teacher['email']) ?></div>
+                                            <div class="ap-muted ui-ellipsis" title="<?= e($teacher['email']) ?>">
+                                                <?= e($teacher['email']) ?></div>
                                         </div>
                                     </div>
-                                    <time class="ap-muted">Cadastro em <?= e(date('d/m/Y H:i', strtotime($teacher['created_at']))) ?></time>
+                                    <time class="ap-muted">Cadastro em
+                                        <?= e(date('d/m/Y H:i', strtotime($teacher['created_at']))) ?></time>
                                 </header>
 
                                 <div>
@@ -490,21 +571,29 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                     <div class="ap-chips">
                                         <?php if (!$specs): ?><span class="ap-muted">Não informadas.</span><?php endif; ?>
                                         <?php foreach (array_slice($specs, 0, 8) as $sp): ?>
-                                            <span class="chip chip-accent" title="<?= e($sp) ?>"><?= e(mb_strimwidth($sp, 0, 40, '…')) ?></span>
+                                            <span class="chip chip-accent"
+                                                title="<?= e($sp) ?>"><?= e(mb_strimwidth($sp, 0, 40, '…')) ?></span>
                                         <?php endforeach; ?>
-                                        <?php if (count($specs) > 8): ?><span class="chip chip-muted">+<?= count($specs) - 8 ?></span><?php endif; ?>
+                                        <?php if (count($specs) > 8): ?><span
+                                                class="chip chip-muted">+<?= count($specs) - 8 ?></span><?php endif; ?>
                                     </div>
                                 </div>
 
                                 <div>
                                     <span class="ap-label">Comprovantes</span>
                                     <div class="ap-chips">
-                                        <?php if (!empty($proofsByUser[$tid])): ?>
+                                        <?php if (!$isAdmin): ?>
+                                            <span class="chip chip-muted"><?= uiIcon('lock', 12) ?>Visualização restrita a
+                                                administradores</span>
+                                        <?php elseif (!empty($proofsByUser[$tid])): ?>
                                             <?php foreach ($proofsByUser[$tid] as $number => $proof): ?>
-                                                <a class="button button-small" href="../endpoints/teacher-proof.php?id=<?= (int) $proof['id'] ?>">Comprovante <?= $number + 1 ?></a>
+                                                <a class="button button-small"
+                                                    href="../endpoints/teacher-proof.php?id=<?= (int) $proof['id'] ?>">Comprovante
+                                                    <?= $number + 1 ?></a>
                                             <?php endforeach; ?>
                                         <?php else: ?>
-                                            <a class="button button-small" href="../endpoints/teacher-proof.php?user=<?= $tid ?>">Visualizar comprovante</a>
+                                            <a class="button button-small"
+                                                href="../endpoints/teacher-proof.php?user=<?= $tid ?>">Visualizar comprovante</a>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -514,19 +603,23 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                         <form action="moderator-dashboard.php" method="post">
                                             <?= csrfInput() ?>
                                             <input type="hidden" name="user_id" value="<?= $tid ?>">
-                                            <button type="submit" name="decision" value="approve" class="button button-small button-primary"
+                                            <button type="submit" name="decision" value="approve"
+                                                class="button button-small button-primary"
                                                 data-confirm="<?= e($teacher['name']) ?> passará a ter o cargo de professor e poderá criar cursos."
-                                                data-confirm-title="Aprovar professor?" data-confirm-yes="Aprovar"><?= uiIcon('check', 14) ?>Aprovar professor</button>
+                                                data-confirm-title="Aprovar professor?"
+                                                data-confirm-yes="Aprovar"><?= uiIcon('check', 14) ?>Aprovar professor</button>
                                         </form>
                                         <form action="moderator-dashboard.php" method="post">
                                             <?= csrfInput() ?>
                                             <input type="hidden" name="user_id" value="<?= $tid ?>">
                                             <button type="submit" name="decision" value="reject" class="button button-small"
                                                 data-confirm="A solicitação de <?= e($teacher['name']) ?> será recusada."
-                                                data-confirm-title="Recusar solicitação?" data-confirm-yes="Recusar" data-confirm-tone="danger">Recusar</button>
+                                                data-confirm-title="Recusar solicitação?" data-confirm-yes="Recusar"
+                                                data-confirm-tone="danger">Recusar</button>
                                         </form>
                                     <?php else: ?>
-                                        <span class="chip chip-muted"><?= uiIcon('lock', 12) ?>Aprovação restrita a administradores</span>
+                                        <span class="chip chip-muted"><?= uiIcon('lock', 12) ?>Aprovação restrita a
+                                            administradores</span>
                                     <?php endif; ?>
                                 </footer>
                             </article>
@@ -540,7 +633,9 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <div class="ap-panel-head">
                     <div>
                         <h2 class="ap-panel-title">Matérias <span class="chip"><?= $countSubjects ?></span></h2>
-                        <p class="ap-panel-sub"><?= $isAdmin ? 'Cadastre, edite e organize as disciplinas da plataforma.' : 'Somente administradores criam ou editam matérias. Você pode acompanhá-las aqui.' ?></p>
+                        <p class="ap-panel-sub">
+                            <?= $isAdmin ? 'Cadastre, edite e organize as disciplinas da plataforma.' : 'Somente administradores criam ou editam matérias. Você pode acompanhá-las aqui.' ?>
+                        </p>
                     </div>
                 </div>
 
@@ -548,24 +643,30 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     <details id="subject-create" class="ui-details">
                         <summary>
                             <span class="ui-summary-icon is-plus"><?= uiIcon('plus', 20) ?></span>
-                            <span class="ui-summary-main"><strong>Cadastrar nova matéria</strong><small>Nome de 2 a 60 caracteres e descrição curta.</small></span>
+                            <span class="ui-summary-main"><strong>Cadastrar nova matéria</strong><small>Nome de 2 a 60
+                                    caracteres e descrição curta.</small></span>
                             <span class="ui-chevron" aria-hidden="true"></span>
                         </summary>
-                        <div class="ui-details-body"><div class="ui-details-inner">
-                            <form class="ui-form" action="moderator-dashboard.php" method="post">
-                                <?= csrfInput() ?>
-                                <input type="hidden" name="mod_action" value="create_subject">
-                                <label class="ui-field">
-                                    <span class="ui-field-top"><span class="ui-field-label">Nome</span></span>
-                                    <input type="text" name="name" class="form-input" minlength="2" maxlength="60" required autocomplete="off" placeholder="Ex.: Redes de Computadores">
-                                </label>
-                                <label class="ui-field">
-                                    <span class="ui-field-top"><span class="ui-field-label">Descrição</span></span>
-                                    <textarea name="description" class="form-input" maxlength="250" data-max-lines="4" placeholder="Resumo curto do que a matéria cobre."></textarea>
-                                </label>
-                                <div class="ui-actions"><button type="submit" class="button button-primary">Salvar matéria</button></div>
-                            </form>
-                        </div></div>
+                        <div class="ui-details-body">
+                            <div class="ui-details-inner">
+                                <form class="ui-form" action="moderator-dashboard.php" method="post">
+                                    <?= csrfInput() ?>
+                                    <input type="hidden" name="mod_action" value="create_subject">
+                                    <label class="ui-field">
+                                        <span class="ui-field-top"><span class="ui-field-label">Nome</span></span>
+                                        <input type="text" name="name" class="form-input" minlength="2" maxlength="60"
+                                            required autocomplete="off" placeholder="Ex.: Redes de Computadores">
+                                    </label>
+                                    <label class="ui-field">
+                                        <span class="ui-field-top"><span class="ui-field-label">Descrição</span></span>
+                                        <textarea name="description" class="form-input" maxlength="250" data-max-lines="4"
+                                            placeholder="Resumo curto do que a matéria cobre."></textarea>
+                                    </label>
+                                    <div class="ui-actions"><button type="submit" class="button button-primary">Salvar
+                                            matéria</button></div>
+                                </form>
+                            </div>
+                        </div>
                     </details>
                 <?php endif; ?>
 
@@ -576,9 +677,11 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                         <div class="ap-toolbar">
                             <label class="ap-search">
                                 <?= uiIcon('search', 18) ?><span class="ui-sr">Buscar matéria</span>
-                                <input type="search" class="form-input" maxlength="80" placeholder="Buscar matéria" data-filter-input autocomplete="off">
+                                <input type="search" class="form-input" maxlength="80" placeholder="Buscar matéria"
+                                    data-filter-input autocomplete="off">
                             </label>
-                            <span class="ap-result-count"><span data-filter-count><?= $countSubjects ?></span> de <?= $countSubjects ?></span>
+                            <span class="ap-result-count"><span data-filter-count><?= $countSubjects ?></span> de
+                                <?= $countSubjects ?></span>
                         </div>
                     </div>
                     <div id="ap-subject-scope">
@@ -590,43 +693,62 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                 <li class="ap-card" data-filter-item data-filter-text="<?= e($sub['name'] . ' ' . $subDesc) ?>">
                                     <div class="ap-subject-top">
                                         <span class="ap-subject-icon"><?= uiIcon('book', 20) ?></span>
-                                        <h3 class="ap-subject-name ui-clamp-2" title="<?= e($sub['name']) ?>"><?= e($sub['name']) ?></h3>
+                                        <h3 class="ap-subject-name ui-clamp-2" title="<?= e($sub['name']) ?>">
+                                            <?= e($sub['name']) ?></h3>
                                     </div>
-                                    <p class="ap-subject-desc ui-clamp-3<?= $subDesc === '' ? ' is-empty' : '' ?>"><?= $subDesc !== '' ? e($subDesc) : 'Sem descrição.' ?></p>
+                                    <p class="ap-subject-desc ui-clamp-3<?= $subDesc === '' ? ' is-empty' : '' ?>">
+                                        <?= $subDesc !== '' ? e($subDesc) : 'Sem descrição.' ?></p>
                                     <div class="ap-chips">
-                                        <span class="chip chip-muted"><?= (int) $sub['course_count'] ?> <?= (int) $sub['course_count'] === 1 ? 'curso' : 'cursos' ?></span>
-                                        <span class="chip chip-muted"><?= (int) $sub['topic_count'] ?> <?= (int) $sub['topic_count'] === 1 ? 'fórum' : 'fóruns' ?></span>
+                                        <span class="chip chip-muted"><?= (int) $sub['course_count'] ?>
+                                            <?= (int) $sub['course_count'] === 1 ? 'curso' : 'cursos' ?></span>
+                                        <span class="chip chip-muted"><?= (int) $sub['topic_count'] ?>
+                                            <?= (int) $sub['topic_count'] === 1 ? 'fórum' : 'fóruns' ?></span>
                                     </div>
                                     <?php if ($isAdmin): ?>
                                         <details class="ui-details ui-details-flat">
-                                            <summary><?= uiIcon('edit', 16) ?><span class="ui-summary-main"><strong>Gerenciar matéria</strong></span><span class="ui-chevron" aria-hidden="true"></span></summary>
-                                            <div class="ui-details-body"><div class="ui-details-inner">
-                                                <form class="ui-form" action="moderator-dashboard.php" method="post">
-                                                    <?= csrfInput() ?>
-                                                    <input type="hidden" name="mod_action" value="edit_subject">
-                                                    <input type="hidden" name="subject_id" value="<?= (int) $sub['id'] ?>">
-                                                    <label class="ui-field">
-                                                        <span class="ui-field-top"><span class="ui-field-label">Nome</span></span>
-                                                        <input type="text" name="name" class="form-input" value="<?= e($sub['name']) ?>" minlength="2" maxlength="60" required autocomplete="off">
-                                                    </label>
-                                                    <label class="ui-field">
-                                                        <span class="ui-field-top"><span class="ui-field-label">Descrição</span></span>
-                                                        <textarea name="description" class="form-input" maxlength="250" data-max-lines="4"><?= e($subDesc) ?></textarea>
-                                                    </label>
-                                                    <div class="ui-actions"><button type="submit" class="button button-primary button-small">Salvar alterações</button></div>
-                                                </form>
-                                                <div class="ap-manage-actions">
-                                                    <form action="moderator-dashboard.php" method="post">
+                                            <summary><?= uiIcon('edit', 16) ?><span class="ui-summary-main"><strong>Gerenciar
+                                                        matéria</strong></span><span class="ui-chevron" aria-hidden="true"></span>
+                                            </summary>
+                                            <div class="ui-details-body">
+                                                <div class="ui-details-inner">
+                                                    <form class="ui-form" action="moderator-dashboard.php" method="post">
                                                         <?= csrfInput() ?>
-                                                        <input type="hidden" name="mod_action" value="delete_subject">
+                                                        <input type="hidden" name="mod_action" value="edit_subject">
                                                         <input type="hidden" name="subject_id" value="<?= (int) $sub['id'] ?>">
-                                                        <button type="submit" class="button button-small button-delete"<?= $linked > 0 ? ' disabled' : '' ?>
-                                                            data-confirm="A matéria “<?= e(mb_strimwidth((string) $sub['name'], 0, 60, '…')) ?>” será excluída."
-                                                            data-confirm-title="Excluir matéria?" data-confirm-yes="Excluir" data-confirm-tone="danger"><?= uiIcon('trash', 14) ?>Excluir matéria</button>
+                                                        <label class="ui-field">
+                                                            <span class="ui-field-top"><span
+                                                                    class="ui-field-label">Nome</span></span>
+                                                            <input type="text" name="name" class="form-input"
+                                                                value="<?= e($sub['name']) ?>" minlength="2" maxlength="60" required
+                                                                autocomplete="off">
+                                                        </label>
+                                                        <label class="ui-field">
+                                                            <span class="ui-field-top"><span
+                                                                    class="ui-field-label">Descrição</span></span>
+                                                            <textarea name="description" class="form-input" maxlength="250"
+                                                                data-max-lines="4"><?= e($subDesc) ?></textarea>
+                                                        </label>
+                                                        <div class="ui-actions"><button type="submit"
+                                                                class="button button-primary button-small">Salvar
+                                                                alterações</button></div>
                                                     </form>
-                                                    <?php if ($linked > 0): ?><p class="ui-note">Para excluir, remova antes os cursos e fóruns vinculados.</p><?php endif; ?>
+                                                    <div class="ap-manage-actions">
+                                                        <form action="moderator-dashboard.php" method="post">
+                                                            <?= csrfInput() ?>
+                                                            <input type="hidden" name="mod_action" value="delete_subject">
+                                                            <input type="hidden" name="subject_id" value="<?= (int) $sub['id'] ?>">
+                                                            <button type="submit" class="button button-small button-delete"
+                                                                <?= $linked > 0 ? ' disabled' : '' ?>
+                                                                data-confirm="A matéria “<?= e(mb_strimwidth((string) $sub['name'], 0, 60, '…')) ?>” será excluída."
+                                                                data-confirm-title="Excluir matéria?" data-confirm-yes="Excluir"
+                                                                data-confirm-tone="danger"><?= uiIcon('trash', 14) ?>Excluir
+                                                                matéria</button>
+                                                        </form>
+                                                        <?php if ($linked > 0): ?><p class="ui-note">Para excluir, remova antes os
+                                                                cursos e fóruns vinculados.</p><?php endif; ?>
+                                                    </div>
                                                 </div>
-                                            </div></div>
+                                            </div>
                                         </details>
                                     <?php endif; ?>
                                 </li>
@@ -641,10 +763,13 @@ include_once __DIR__ . '/../includes/cabecalho.php';
             <section id="mod-courses" class="ap-panel" data-ap-panel>
                 <div class="ap-panel-head">
                     <div>
-                        <h2 class="ap-panel-title">Cursos da plataforma <span class="chip"><?= $countCourses ?></span></h2>
-                        <p class="ap-panel-sub"><?= $isAdmin
-                            ? 'Publique, despublique ou exclua qualquer curso da plataforma.'
-                            : 'Publique, despublique ou exclua cursos. A criação de conteúdo fica com os professores.' ?></p>
+                        <h2 class="ap-panel-title">Cursos da plataforma <span class="chip"><?= $countCourses ?></span>
+                        </h2>
+                        <p class="ap-panel-sub">
+                            <?= $isAdmin
+                                ? 'Publique, despublique ou exclua qualquer curso da plataforma.'
+                                : 'Publique, despublique ou exclua cursos. A criação de conteúdo fica com os professores.' ?>
+                        </p>
                     </div>
                 </div>
 
@@ -655,15 +780,21 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                         <div class="ap-toolbar">
                             <label class="ap-search">
                                 <?= uiIcon('search', 18) ?><span class="ui-sr">Buscar curso</span>
-                                <input type="search" class="form-input" maxlength="80" placeholder="Curso, matéria ou professor" data-filter-input autocomplete="off">
+                                <input type="search" class="form-input" maxlength="80"
+                                    placeholder="Curso, matéria ou professor" data-filter-input autocomplete="off">
                             </label>
                             <div class="ap-pills" role="group" aria-label="Filtrar por situação">
-                                <button type="button" class="ap-pill is-active" data-filter-tag="all" aria-pressed="true">Todos <small><?= $countCourses ?></small></button>
-                                <button type="button" class="ap-pill" data-filter-tag="published" aria-pressed="false">Publicados <small><?= $publishedCount ?></small></button>
-                                <button type="button" class="ap-pill" data-filter-tag="draft" aria-pressed="false">Rascunhos <small><?= count($draftCourses) ?></small></button>
-                                <button type="button" class="ap-pill" data-filter-tag="empty" aria-pressed="false">Sem aulas <small><?= count($emptyCourses) ?></small></button>
+                                <button type="button" class="ap-pill is-active" data-filter-tag="all"
+                                    aria-pressed="true">Todos <small><?= $countCourses ?></small></button>
+                                <button type="button" class="ap-pill" data-filter-tag="published"
+                                    aria-pressed="false">Publicados <small><?= $publishedCount ?></small></button>
+                                <button type="button" class="ap-pill" data-filter-tag="draft" aria-pressed="false">Rascunhos
+                                    <small><?= count($draftCourses) ?></small></button>
+                                <button type="button" class="ap-pill" data-filter-tag="empty" aria-pressed="false">Sem aulas
+                                    <small><?= count($emptyCourses) ?></small></button>
                             </div>
-                            <span class="ap-result-count"><span data-filter-count><?= $countCourses ?></span> de <?= $countCourses ?></span>
+                            <span class="ap-result-count"><span data-filter-count><?= $countCourses ?></span> de
+                                <?= $countCourses ?></span>
                         </div>
                     </div>
                     <div id="ap-course-scope">
@@ -677,13 +808,17 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                     data-filter-text="<?= e($c['title'] . ' ' . $c['subject_name'] . ' ' . $c['teacher_name']) ?>"
                                     data-filter-tags="<?= e($tags) ?>">
                                     <div class="ap-row-main">
-                                        <h3 class="ap-row-title ui-clamp-2"><a href="course.php?id=<?= $cid ?>"><?= e($c['title']) ?></a></h3>
+                                        <h3 class="ap-row-title ui-clamp-2"><a
+                                                href="course.php?id=<?= $cid ?>"><?= e($c['title']) ?></a></h3>
                                         <div class="ap-row-meta">
-                                            <span class="chip chip-accent" title="<?= e($c['subject_name']) ?>"><?= e($c['subject_name']) ?></span>
-                                            <span class="chip <?= $pub ? 'chip-primary' : 'chip-draft' ?>"><?= $pub ? 'Publicado' : 'Rascunho' ?></span>
+                                            <span class="chip chip-accent"
+                                                title="<?= e($c['subject_name']) ?>"><?= e($c['subject_name']) ?></span>
+                                            <span
+                                                class="chip <?= $pub ? 'chip-primary' : 'chip-draft' ?>"><?= $pub ? 'Publicado' : 'Rascunho' ?></span>
                                             <span class="chip chip-muted"><?= (int) $c['lesson_count'] ?> aulas</span>
                                             <span class="chip chip-muted"><?= (int) $c['student_count'] ?> alunos</span>
-                                            <span class="ap-muted ui-ellipsis" title="<?= e($c['teacher_name']) ?>">Prof. <?= e($c['teacher_name']) ?></span>
+                                            <span class="ap-muted ui-ellipsis" title="<?= e($c['teacher_name']) ?>">Prof.
+                                                <?= e($c['teacher_name']) ?></span>
                                         </div>
                                     </div>
                                     <div class="ap-row-actions">
@@ -691,7 +826,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                             <?= csrfInput() ?>
                                             <input type="hidden" name="mod_action" value="toggle_course_publish">
                                             <input type="hidden" name="course_id" value="<?= $cid ?>">
-                                            <button type="submit" class="button button-small <?= $pub ? '' : 'button-primary' ?>"
+                                            <button type="submit"
+                                                class="button button-small <?= $pub ? '' : 'button-primary' ?>"
                                                 data-confirm="<?= $pub ? 'O curso deixará de aparecer para os alunos.' : 'O curso ficará visível para todos os alunos.' ?>"
                                                 data-confirm-title="<?= $pub ? 'Despublicar curso?' : 'Publicar curso?' ?>"
                                                 data-confirm-yes="<?= $pub ? 'Despublicar' : 'Publicar' ?>"><?= $pub ? 'Despublicar' : 'Publicar' ?></button>
@@ -701,15 +837,18 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                             <?= csrfInput() ?>
                                             <input type="hidden" name="mod_action" value="delete_course">
                                             <input type="hidden" name="course_id" value="<?= $cid ?>">
-                                            <button type="submit" class="button button-small button-delete" title="Excluir curso" aria-label="Excluir curso <?= e($c['title']) ?>"
+                                            <button type="submit" class="button button-small button-delete"
+                                                title="Excluir curso" aria-label="Excluir curso <?= e($c['title']) ?>"
                                                 data-confirm="O curso “<?= e(mb_strimwidth((string) $c['title'], 0, 60, '…')) ?>”, suas aulas e matrículas serão apagados para sempre."
-                                                data-confirm-title="Excluir curso?" data-confirm-yes="Excluir curso" data-confirm-tone="danger"><?= uiIcon('trash', 14) ?></button>
+                                                data-confirm-title="Excluir curso?" data-confirm-yes="Excluir curso"
+                                                data-confirm-tone="danger"><?= uiIcon('trash', 14) ?></button>
                                         </form>
                                     </div>
                                 </li>
                             <?php endforeach; ?>
                         </ul>
-                        <div class="ui-empty" data-filter-empty hidden><strong>Nenhum curso encontrado com esses filtros.</strong></div>
+                        <div class="ui-empty" data-filter-empty hidden><strong>Nenhum curso encontrado com esses
+                                filtros.</strong></div>
                     </div>
                 <?php endif; ?>
             </section>
@@ -718,10 +857,13 @@ include_once __DIR__ . '/../includes/cabecalho.php';
             <section id="mod-forums" class="ap-panel" data-ap-panel>
                 <div class="ap-panel-head">
                     <div>
-                        <h2 class="ap-panel-title">Tópicos dos fóruns <span class="chip"><?= count($forumTopics) ?></span></h2>
-                        <p class="ap-panel-sub">Os 30 tópicos mais recentes. Para denúncias e sanções use a fila de moderação.</p>
+                        <h2 class="ap-panel-title">Tópicos dos fóruns <span
+                                class="chip"><?= count($forumTopics) ?></span></h2>
+                        <p class="ap-panel-sub">Os 30 tópicos mais recentes. Para denúncias e sanções use a fila de
+                            moderação.</p>
                     </div>
-                    <a class="button button-small" href="moderation.php"><?= uiIcon('shield', 16) ?>Fila de moderação</a>
+                    <a class="button button-small" href="moderation.php"><?= uiIcon('shield', 16) ?>Fila de
+                        moderação</a>
                 </div>
 
                 <?php if (!$forumTopics): ?>
@@ -731,31 +873,42 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                         <div class="ap-toolbar">
                             <label class="ap-search">
                                 <?= uiIcon('search', 18) ?><span class="ui-sr">Buscar tópico</span>
-                                <input type="search" class="form-input" maxlength="80" placeholder="Título, matéria ou autor" data-filter-input autocomplete="off">
+                                <input type="search" class="form-input" maxlength="80"
+                                    placeholder="Título, matéria ou autor" data-filter-input autocomplete="off">
                             </label>
-                            <span class="ap-result-count"><span data-filter-count><?= count($forumTopics) ?></span> de <?= count($forumTopics) ?></span>
+                            <span class="ap-result-count"><span data-filter-count><?= count($forumTopics) ?></span> de
+                                <?= count($forumTopics) ?></span>
                         </div>
                     </div>
                     <div id="ap-forum-scope">
                         <ul class="ap-list">
                             <?php foreach ($forumTopics as $topic): ?>
-                                <li class="ap-row" data-filter-item data-filter-text="<?= e($topic['title'] . ' ' . $topic['subject_name'] . ' ' . $topic['author']) ?>">
+                                <li class="ap-row" data-filter-item
+                                    data-filter-text="<?= e($topic['title'] . ' ' . $topic['subject_name'] . ' ' . $topic['author']) ?>">
                                     <div class="ap-row-main">
-                                        <h3 class="ap-row-title ui-clamp-2"><a href="forum-topic.php?id=<?= (int) $topic['id'] ?>"><?= e($topic['title']) ?></a></h3>
+                                        <h3 class="ap-row-title ui-clamp-2"><a
+                                                href="forum-topic.php?id=<?= (int) $topic['id'] ?>"><?= e($topic['title']) ?></a>
+                                        </h3>
                                         <div class="ap-row-meta">
-                                            <span class="chip chip-accent" title="<?= e($topic['subject_name']) ?>"><?= e($topic['subject_name']) ?></span>
-                                            <span class="chip chip-muted"><?= (int) $topic['post_count'] ?> <?= (int) $topic['post_count'] === 1 ? 'resposta' : 'respostas' ?></span>
-                                            <span class="ap-muted ui-ellipsis">por <?= e($topic['author']) ?> · <?= e(date('d/m/Y', strtotime($topic['created_at']))) ?></span>
+                                            <span class="chip chip-accent"
+                                                title="<?= e($topic['subject_name']) ?>"><?= e($topic['subject_name']) ?></span>
+                                            <span class="chip chip-muted"><?= (int) $topic['post_count'] ?>
+                                                <?= (int) $topic['post_count'] === 1 ? 'resposta' : 'respostas' ?></span>
+                                            <span class="ap-muted ui-ellipsis">por <?= e($topic['author']) ?> ·
+                                                <?= e(date('d/m/Y', strtotime($topic['created_at']))) ?></span>
                                         </div>
                                     </div>
                                     <div class="ap-row-actions">
-                                        <a class="button button-small" href="forum-topic.php?id=<?= (int) $topic['id'] ?>">Revisar</a>
+                                        <a class="button button-small"
+                                            href="forum-topic.php?id=<?= (int) $topic['id'] ?>">Revisar</a>
                                         <form action="moderator-dashboard.php" method="post">
                                             <?= csrfInput() ?>
                                             <input type="hidden" name="forum_topic_id" value="<?= (int) $topic['id'] ?>">
-                                            <button type="submit" class="button button-small button-delete" aria-label="Excluir tópico <?= e($topic['title']) ?>"
+                                            <button type="submit" class="button button-small button-delete"
+                                                aria-label="Excluir tópico <?= e($topic['title']) ?>"
                                                 data-confirm="O tópico e todas as mensagens dele serão apagados."
-                                                data-confirm-title="Excluir tópico?" data-confirm-yes="Excluir tópico" data-confirm-tone="danger"><?= uiIcon('trash', 14) ?>Excluir</button>
+                                                data-confirm-title="Excluir tópico?" data-confirm-yes="Excluir tópico"
+                                                data-confirm-tone="danger"><?= uiIcon('trash', 14) ?>Excluir</button>
                                         </form>
                                     </div>
                                 </li>

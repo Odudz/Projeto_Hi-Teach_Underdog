@@ -8,7 +8,7 @@ if ($user) {
 $pageId = 'index';
 $pageTitle = 'Início';
 $baseUrl = '';
-$extraCss = ['home'];
+$extraCss = ['home', 'courses'];
 include_once __DIR__ . '/includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content home-main">

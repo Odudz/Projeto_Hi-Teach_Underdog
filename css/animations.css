@@ -7,12 +7,12 @@ body::after {
   border-right: var(--border);
 }
 body::before {
-  z-index: 1000;
+  z-index: var(--z-page-fx);
   background: var(--color-primary);
   animation: page-enter var(--duration-slow) var(--ease-in-out) 120ms both;
 }
 body::after {
-  z-index: 1001;
+  z-index: calc(var(--z-page-fx) + 1);
   background: var(--color-header);
   animation: page-enter var(--duration-slow) var(--ease-in-out) both;
 }

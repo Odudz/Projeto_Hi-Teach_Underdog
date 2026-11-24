@@ -1,6 +1,7 @@
 <?php
+
 /**
- * RBAC do Hi Teach — Controle de Acesso e Auditoria
+ * RBAC do Hi Teach — Controle de Acesso, Sanções e Auditoria
  */
 
 const RBAC_ROLES = ['student', 'teacher', 'moderator', 'admin'];
@@ -36,10 +37,12 @@ function rbacClientIp(): ?string
 
 function rbacEnsureSchema(PDO $pdo): void
 {
-    if (!empty($_SESSION['rbac_schema_checked_v4'])) {
-        return;
-    }
     try {
+        $dbName = (string) $pdo->query('SELECT DATABASE()')->fetchColumn();
+        if ($dbName !== '' && ($_SESSION['rbac_schema_checked_v4'] ?? '') === $dbName) {
+            return;
+        }
+
         // Garante que users.role aceite 'moderator' (bancos criados antes desta versão tinham o enum sem ele)
         $roleType = $pdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")->fetchColumn();
         if (is_string($roleType) && !str_contains($roleType, "'moderator'")) {
@@ -99,14 +102,50 @@ function rbacEnsureSchema(PDO $pdo): void
                 resolution VARCHAR(255) NULL DEFAULT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
+                UNIQUE KEY uq_report_once (reporter_id, target_type, target_id),
                 KEY idx_report_status (status)
             ) $tail"
         );
 
-        $_SESSION['rbac_schema_checked_v4'] = true;
+        if ($dbName !== '') {
+            $_SESSION['rbac_schema_checked_v4'] = $dbName;
+        }
     } catch (Throwable $e) {
         error_log('rbacEnsureSchema: ' . $e->getMessage());
     }
+}
+
+function rbacActiveSanction(PDO $pdo, int $userId, string $type): ?array
+{
+    if ($userId <= 0 || !in_array($type, ['mute', 'suspension'], true)) {
+        return null;
+    }
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT id, type, reason, expires_at
+             FROM user_sanctions
+             WHERE user_id = ? AND type = ? AND revoked_at IS NULL
+               AND (expires_at IS NULL OR expires_at > NOW())
+             ORDER BY expires_at IS NULL DESC, expires_at DESC
+             LIMIT 1'
+        );
+        $stmt->execute([$userId, $type]);
+        return $stmt->fetch() ?: null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+function rbacSanctionMessage(array $sanction): string
+{
+    $prefix = ($sanction['type'] ?? '') === 'suspension'
+        ? 'Sua conta está suspensa'
+        : 'Você está silenciado(a) e não pode enviar mensagens no momento';
+    $until = !empty($sanction['expires_at'])
+        ? ' até ' . date('d/m/Y H:i', strtotime((string) $sanction['expires_at']))
+        : ' por tempo indeterminado';
+    $reason = trim((string) ($sanction['reason'] ?? ''));
+    return $prefix . $until . ($reason !== '' ? '. Motivo: ' . $reason : '.');
 }
 
 function ensureRole(array $roles, string $baseUrl = '../'): void
@@ -142,7 +181,7 @@ function rbacAudit(
     ?array $new = null,
     ?string $reason = null
 ): void {
-    $json = static fn (?array $data): ?string => $data === null
+    $json = static fn(?array $data): ?string => $data === null
         ? null
         : json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -191,9 +230,12 @@ function rbacApplySanction(PDO $pdo, array $actor, int $targetId, string $type, 
     )->execute([$targetId, $type, $reason, $actor['id']]);
 
     rbacAudit(
-        $pdo, (int) $actor['id'],
+        $pdo,
+        (int) $actor['id'],
         $type === 'suspension' ? 'USER_SUSPENDED' : 'USER_MUTED',
-        'user', $targetId, null,
+        'user',
+        $targetId,
+        null,
         ['type' => $type, 'days' => $days],
         $reason
     );
@@ -212,8 +254,14 @@ function rbacRevokeSanction(PDO $pdo, array $actor, int $sanctionId, string $rea
         ->execute([$actor['id'], $sanctionId]);
 
     rbacAudit(
-        $pdo, (int) $actor['id'], 'SANCTION_REVOKED', 'user', (int) $sanction['user_id'],
-        ['type' => $sanction['type'], 'sanction_id' => $sanctionId], null, $reason
+        $pdo,
+        (int) $actor['id'],
+        'SANCTION_REVOKED',
+        'user',
+        (int) $sanction['user_id'],
+        ['type' => $sanction['type'], 'sanction_id' => $sanctionId],
+        null,
+        $reason
     );
 }
 

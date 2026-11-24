@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/courses.php';
 require_once __DIR__ . '/../includes/rbac.php';
+require_once __DIR__ . '/../includes/ratings.php';
 
 $stmt = $pdo->prepare('SELECT * FROM lessons WHERE id=?');
 $stmt->execute([(int) ($_GET['id'] ?? 0)]);
@@ -29,7 +30,7 @@ $videoId = $lesson['youtube_video_id'];
 $pageId = 'video';
 $pageTitle = $lesson['title'];
 $baseUrl = '../';
-$extraCss = ['courses'];
+$extraCss = ['courses', 'ratings'];
 $extraJs = ['youtube'];
 
 include __DIR__ . '/../includes/cabecalho.php';
@@ -141,6 +142,19 @@ include __DIR__ . '/../includes/cabecalho.php';
                             alunos matriculados.</p>
                     </div>
                 <?php endif; ?>
+                <?php
+                $canRateLesson = $user['role'] === 'student';
+                echo '<div class="action-card action-card-rating">' . ratingRender(
+                    $pdo,
+                    'lesson',
+                    (int) $lesson['id'],
+                    (int) $course['id'],
+                    (int) $user['id'],
+                    $canRateLesson,
+                    $canRateLesson ? 'Avalie esta aula' : 'Avaliação da aula',
+                    'rating-lesson'
+                ) . '</div>';
+                ?>
             </div>
         </div>
     </div>

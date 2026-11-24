@@ -45,14 +45,14 @@ textarea.form-textarea-fixed {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 24px;
-  height: 24px;
+  width: calc(24px * var(--ui-eff));
+  height: calc(24px * var(--ui-eff));
   padding: 0;
   background: var(--color-background);
   color: var(--color-text);
   border: 2px solid var(--color-border);
   border-radius: 50%;
-  font-size: 16px;
+  font-size: calc(16px * var(--text-eff));
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
@@ -108,8 +108,9 @@ textarea.form-textarea-fixed {
   transform: translate(-2px, -2px);
   box-shadow: var(--shadow-md);
 }
-.dropzone:focus {
-  outline: none;
+.dropzone:focus-visible {
+  outline: var(--border-width) solid var(--color-primary);
+  outline-offset: 3px;
 }
 .dropzone.is-over {
   border-style: solid;

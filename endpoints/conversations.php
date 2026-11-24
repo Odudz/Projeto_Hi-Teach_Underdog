@@ -1,6 +1,7 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/social.php';
+require_once __DIR__ . '/../includes/rbac.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('../pages/contacts.php');
@@ -23,6 +24,10 @@ $me = (int) $user['id'];
 try {
     if ($action === 'friend_by_tag' || $action === 'message_by_tag') {
         $back = socialReturnUrl('contacts:add');
+        if ($action === 'message_by_tag' && ($mute = rbacActiveSanction($pdo, $me, 'mute'))) {
+            setFlash('error', rbacSanctionMessage($mute));
+            redirect($back);
+        }
         [$person, $problem] = socialFindByTag($pdo, (string) ($_POST['tag'] ?? ''), $me);
         if ($person === null) {
             setFlash('error', (string) $problem);

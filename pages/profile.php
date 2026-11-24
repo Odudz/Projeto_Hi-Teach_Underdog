@@ -140,11 +140,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $kind === 'delete-account') {
 
     if ($deleteError === '') {
         try {
+            recoveryEnsureColumn($pdo);
             if ($newPhraseHash !== null) {
-                $pdo->prepare('UPDATE users SET activate = 0, recovery_phrase_hash = ? WHERE id = ?')
+                $pdo->prepare("UPDATE users SET activate = 0, deactivated_by = 'user', recovery_phrase_hash = ? WHERE id = ?")
                     ->execute([$newPhraseHash, $user['id']]);
             } else {
-                $pdo->prepare('UPDATE users SET activate = 0 WHERE id = ?')->execute([$user['id']]);
+                $pdo->prepare("UPDATE users SET activate = 0, deactivated_by = 'user' WHERE id = ?")
+                    ->execute([$user['id']]);
             }
         } catch (PDOException $exception) {
             error_log('profile.php: deactivate_failed: ' . $exception->getMessage());
@@ -172,7 +174,6 @@ if ($isImageUpload) {
 
     [$maxMb, $maxPx, $successMessage] = $imageKinds[$kind];
     $imageError = '';
-    // Upload em base64 (o host bloqueia multipart binário com 403). Mantém $_FILES como alternativa.
     $uploadFile = $_FILES['image'] ?? null;
     $tmpImage = null;
     $b64 = $_POST['image_b64'] ?? '';
@@ -276,6 +277,48 @@ $stmt->execute([$user['id']]);
 $forumPostsCount = (int) $stmt->fetchColumn();
 $memberSince = date('d/m/Y', strtotime($user['created_at']));
 
+$statCoursesValue = 0;
+$statCoursesLabel = 'Cursos';
+$statLessonsValue = 0;
+$statLessonsLabel = 'Aulas assistidas';
+try {
+    if ($user['role'] === 'student') {
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(DISTINCT c.id)
+             FROM courses c
+             LEFT JOIN course_enrollments ce ON ce.course_id = c.id AND ce.student_id = ?
+             LEFT JOIN subject_enrollments se ON se.subject_id = c.subject_id AND se.student_id = ?
+             WHERE c.is_published = 1 AND (ce.student_id IS NOT NULL OR se.student_id IS NOT NULL)'
+        );
+        $stmt->execute([$user['id'], $user['id']]);
+        $statCoursesValue = (int) $stmt->fetchColumn();
+
+        $stmt = $pdo->prepare(
+            'SELECT COUNT(*) FROM lesson_progress lp
+             JOIN lessons l ON l.id = lp.lesson_id
+             WHERE lp.student_id = ? AND l.is_published = 1'
+        );
+        $stmt->execute([$user['id']]);
+        $statLessonsValue = (int) $stmt->fetchColumn();
+    } elseif ($user['role'] === 'teacher') {
+        $statCoursesLabel = 'Cursos criados';
+        $statLessonsLabel = 'Aulas publicadas';
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM courses WHERE teacher_id = ?');
+        $stmt->execute([$user['id']]);
+        $statCoursesValue = (int) $stmt->fetchColumn();
+
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM lessons WHERE teacher_id = ?');
+        $stmt->execute([$user['id']]);
+        $statLessonsValue = (int) $stmt->fetchColumn();
+    } else {
+        $statCoursesLabel = 'Cursos ativos';
+        $statLessonsLabel = 'Aulas na plataforma';
+        $statCoursesValue = (int) $pdo->query('SELECT COUNT(*) FROM courses')->fetchColumn();
+        $statLessonsValue = (int) $pdo->query('SELECT COUNT(*) FROM lessons')->fetchColumn();
+    }
+} catch (Throwable $e) {
+}
+
 ob_start();
 ?>
 <div id="edit-profile-modal" class="modal-overlay <?= ($openModal ?? '') === 'edit-profile-modal' ? 'is-open' : '' ?>">
@@ -337,6 +380,21 @@ ob_start();
         if (bio && counter) counter.textContent = `${Array.from(bio.value).length}/250`;
     })();
 </script>
+
+<?php if (!empty($user['bio'])): ?>
+    <div id="bio-detail-modal" class="modal-overlay">
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="bio-detail-title">
+            <header class="modal-header">
+                <h2 id="bio-detail-title" class="modal-title">Biografia</h2>
+                <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
+            </header>
+
+            <div class="bio-full-content">
+                <?= e($user['bio']) ?>
+            </div>
+        </section>
+    </div>
+<?php endif; ?>
 
 <?php
 $modals = ob_get_clean();
@@ -620,7 +678,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     <p id="profile-bio" class="profile-bio"><?= e($bioPrevia) ?><?= $temMaisDe3Linhas ? '...' : '' ?></p>
 
                     <?php if ($temMaisDe3Linhas): ?>
-                        <button type="button" class="bio-expand-button" data-modal-open="bio-detail-modal">
+                        <button type="button" class="bio-expand-button" aria-haspopup="dialog"
+                            data-modal-open="bio-detail-modal">
                             Expandir biografia
                         </button>
                     <?php endif; ?>
@@ -639,33 +698,21 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     <button type="submit" id="logout-button" class="button button-danger">Sair</button>
                 </form>
             </div>
+        </div>
     </section>
 
-    <div id="bio-detail-modal" class="modal-overlay">
-        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="bio-detail-title">
-            <header class="modal-header">
-                <h2 id="bio-detail-title" class="modal-title">Biografia</h2>
-                <button type="button" class="modal-close" data-modal-close aria-label="Fechar">×</button>
-            </header>
-
-            <div class="bio-full-content">
-                <?= e($user['bio']) ?>
-            </div>
-        </section>
-    </div>
-
     <section id="profile-stats" class="profile-stats">
-        <div class="stat-card">
-            <span id="stat-courses" class="stat-value">0</span>
-            <span class="stat-label">Cursos</span>
+        <div class="profile-stat-card">
+            <span id="stat-courses" class="profile-stat-value"><?= $statCoursesValue ?></span>
+            <span class="profile-stat-label"><?= e($statCoursesLabel) ?></span>
         </div>
-        <div class="stat-card">
-            <span id="stat-lessons" class="stat-value">0</span>
-            <span class="stat-label">Aulas assistidas</span>
+        <div class="profile-stat-card">
+            <span id="stat-lessons" class="profile-stat-value"><?= $statLessonsValue ?></span>
+            <span class="profile-stat-label"><?= e($statLessonsLabel) ?></span>
         </div>
-        <div class="stat-card">
-            <span id="stat-posts" class="stat-value"><?= $forumPostsCount ?></span>
-            <span class="stat-label">Mensagens em fóruns</span>
+        <div class="profile-stat-card">
+            <span id="stat-posts" class="profile-stat-value"><?= $forumPostsCount ?></span>
+            <span class="profile-stat-label">Mensagens em fóruns</span>
         </div>
     </section>
 
@@ -699,44 +746,5 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         </div>
     </section>
 
-    <section id="profile-badges" class="section">
-        <h2 class="section-title">Conquistas</h2>
-        <ul id="badge-list" class="badge-list">
-            <li class="badge-item">
-                <span class="badge-icon">★</span>
-                <span class="badge-name">Primeira aula</span>
-            </li>
-            <li class="badge-item">
-                <span class="badge-icon">▶</span>
-                <span class="badge-name">10 vídeos assistidos</span>
-            </li>
-            <li class="badge-item">
-                <span class="badge-icon">✉</span>
-                <span class="badge-name">Voz no fórum</span>
-            </li>
-            <li class="badge-item">
-                <span class="badge-icon">✎</span>
-                <span class="badge-name">Atividade entregue</span>
-            </li>
-        </ul>
-    </section>
-
-    <?php if (in_array($user['role'], ['teacher', 'moderator', 'admin'], true)): ?>
-        <section id="profile-links" class="section">
-            <h2 class="section-title">Painéis</h2>
-            <div class="profile-actions">
-                <?php if ($user['role'] === 'teacher'): ?>
-                    <a id="link-teacher-dashboard" class="button button-secondary" href="teacher-dashboard.php">
-                        Painel do professor
-                    </a>
-                <?php endif; ?>
-                <?php if ($user['role'] === 'admin'): ?>
-                    <a id="link-moderator-dashboard" class="button button-secondary" href="moderator-dashboard.php">
-                        Administração
-                    </a>
-                <?php endif; ?>
-            </div>
-        </section>
-    <?php endif; ?>
 </main>
 <?php include_once __DIR__ . '/../includes/rodape.php'; ?>

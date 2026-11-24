@@ -1,10 +1,9 @@
 <?php
+
 /**
- * Reativa uma conta desativada usando e-mail + frase recuperadora.
+ * Reativa uma conta desativada pelo próprio usuário usando e-mail + frase recuperadora.
+ * Contas desativadas pela administração NÃO podem ser reativadas por aqui.
  * Recebe o formulário do modal "Recuperar conta" (auth/login.php).
- *
- * Por segurança a resposta de erro é sempre a mesma, exista a conta ou não,
- * e há um limite de tentativas erradas (ver includes/recovery.php).
  */
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/recovery.php';
@@ -27,6 +26,15 @@ function recoverRespond(bool $wantsJson, int $status, array $payload): never
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirect('login.php');
 }
+
+if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
+    recoverRespond($wantsJson, 419, [
+        'ok' => false,
+        'message' => 'Sua sessão expirou. Recarregue a página e tente de novo.',
+    ]);
+}
+
+recoveryEnsureColumn($pdo);
 
 $email = strtolower(trim((string) ($_POST['email'] ?? '')));
 $phrase = (string) ($_POST['recovery_phrase'] ?? '');
@@ -58,7 +66,7 @@ if (recoveryIsBlocked($pdo, $key)) {
     ]);
 }
 
-$stmt = $pdo->prepare('SELECT id, activate, recovery_phrase_hash FROM users WHERE email = ?');
+$stmt = $pdo->prepare('SELECT id, activate, deactivated_by, recovery_phrase_hash FROM users WHERE email = ?');
 $stmt->execute([$email]);
 $account = $stmt->fetch();
 
@@ -66,10 +74,19 @@ $hash = $account['recovery_phrase_hash'] ?? null;
 if (!$hash) {
     recoveryDummyVerify();
 }
-// A frase só reativa contas desativadas
-$matches = $account && (int) $account['activate'] === 0 && verifyRecoveryPhrase($phrase, $hash);
+// A frase só funciona para contas desativadas
+$phraseOk = $account && (int) $account['activate'] === 0 && verifyRecoveryPhrase($phrase, $hash);
 
-if (!$matches) {
+if ($phraseOk && ($account['deactivated_by'] ?? null) === 'admin') {
+    recoveryRegisterFailure($pdo, $key);
+    recoverRespond($wantsJson, 403, [
+        'ok' => false,
+        'admin_deactivated' => true,
+        'message' => 'Esta conta foi desativada pela administração e não pode ser reativada com a frase recuperadora. Entre em contato com o suporte.',
+    ]);
+}
+
+if (!$phraseOk) {
     recoveryRegisterFailure($pdo, $key);
 
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM login_attempts WHERE email_hash = ? AND attempted_at >= ?');
@@ -87,7 +104,7 @@ if (!$matches) {
     ]);
 }
 
-$pdo->prepare('UPDATE users SET activate = 1 WHERE id = ?')->execute([(int) $account['id']]);
+$pdo->prepare('UPDATE users SET activate = 1, deactivated_by = NULL WHERE id = ?')->execute([(int) $account['id']]);
 recoveryClearFailures($pdo, $key);
 
 recoverRespond($wantsJson, 200, [

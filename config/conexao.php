@@ -3,15 +3,15 @@ $serverName = $_SERVER['SERVER_NAME'] ?? '';
 $httpHost = $_SERVER['HTTP_HOST'] ?? '';
 $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
 
-$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1'], true)
-    || str_contains($serverName, 'localhost')
+$localClient = in_array($remoteAddr, ['127.0.0.1', '::1'], true);
+$localHost = str_contains($serverName, 'localhost')
     || str_contains($httpHost, 'localhost')
     || str_contains($serverName, '127.0.0.1')
     || str_contains($httpHost, '127.0.0.1');
+$isLocal = $localClient && $localHost;
 
 $debug = getenv('HT_DEBUG') === '1' || $isLocal;
 error_reporting(E_ALL);
-// Ativa display_errors no seu computador para nunca mais dar tela branca misteriosa
 ini_set('display_errors', $debug ? '1' : '0');
 ini_set('log_errors', '1');
 
@@ -141,5 +141,25 @@ if (!empty($_SESSION['uid'])) {
 
     if ($user === null) {
         unset($_SESSION['uid']);
+    } else {
+        try {
+            $suspStmt = $pdo->prepare(
+                "SELECT reason, expires_at FROM user_sanctions
+                 WHERE user_id = ? AND type = 'suspension' AND revoked_at IS NULL
+                   AND (expires_at IS NULL OR expires_at > NOW())
+                 ORDER BY expires_at IS NULL DESC, expires_at DESC LIMIT 1"
+            );
+            $suspStmt->execute([$user['id']]);
+            if ($susp = $suspStmt->fetch()) {
+                $until = !empty($susp['expires_at'])
+                    ? ' até ' . date('d/m/Y H:i', strtotime((string) $susp['expires_at']))
+                    : ' por tempo indeterminado';
+                unset($_SESSION['uid']);
+                $user = null;
+                setFlash('error', 'Sua conta está suspensa' . $until . '. Motivo: ' . $susp['reason']);
+            }
+        } catch (Throwable $e) {
+            // Silencioso caso user_sanctions ainda não exista
+        }
     }
 }

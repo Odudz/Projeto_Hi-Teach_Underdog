@@ -29,6 +29,7 @@ $replyText = '';
 $canModerate = $user && in_array($user['role'], ['admin', 'moderator', 'teacher'], true);
 $isOwner = $user && (int) $user['id'] === (int) $topic['author_id'];
 $canManage = $isOwner || $canModerate;
+$activeMute = $user ? rbacActiveSanction($pdo, (int) $user['id'], 'mute') : null;
 
 function chatFindPost(PDO $pdo, int $postId, int $topicId): ?array
 {
@@ -64,6 +65,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     requireCsrf($self, $isFetch);
+
+    if ($activeMute !== null && in_array($action, ['edit_topic', 'edit_post', 'reply'], true)) {
+        $muteMsg = rbacSanctionMessage($activeMute);
+        if ($isFetch) {
+            chatJson(403, ['ok' => false, 'error' => $muteMsg]);
+        }
+        setFlash('error', $muteMsg);
+        redirect($self);
+    }
 
     if ($action === 'edit_topic') {
         $newTitle = forumCleanTitle((string) ($_POST['title'] ?? ''));
@@ -438,8 +448,8 @@ function chatRenderMessage(array $post, array $attachments, ?array $viewer, bool
 
 $pageId = 'forum-topic';
 $pageTitle = $topic['title'];
-$extraCss = ['forum', 'staff'];
-$extraJs = ['forum', 'forum-topic'];
+$extraCss = ['forum', 'staff', 'contacts'];
+$extraJs = ['forum', 'forum-topic', 'scroll-jump'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
@@ -544,6 +554,10 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <p><a class="card-link" href="../auth/login.php?next=pages/forum-topic.php%3Fid%3D<?= $topicId ?>">Entre na
                         sua conta</a> para responder.</p>
             </div>
+        <?php elseif ($activeMute !== null): ?>
+            <div class="write-locked">
+                <p><?= e(rbacSanctionMessage($activeMute)) ?></p>
+            </div>
         <?php else: ?>
             <form id="reply-form" class="form write-sheet" action="<?= e($self) ?>" method="post"
                 enctype="multipart/form-data">
@@ -554,6 +568,10 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     data-chat-lines="<?= CHAT_MESSAGE_MAX_LINES ?>" required><?= e($replyText) ?></textarea>
                 <p id="reply-error" class="chat-edit-error" role="alert" hidden></p>
                 <div class="chat-tools write-tools">
+                    <div class="emoji-wrap">
+                        <button type="button" class="emoji-toggle" aria-label="Inserir emoji" aria-haspopup="true"
+                            aria-expanded="false">😊</button>
+                    </div>
                     <small id="reply-counter" class="field-counter" aria-live="polite">0/<?= CHAT_MESSAGE_MAX ?></small>
                     <button type="submit" id="reply-form-submit" class="button button-primary write-send">Enviar
                         Resposta</button>
@@ -561,5 +579,19 @@ include_once __DIR__ . '/../includes/cabecalho.php';
             </form>
         <?php endif; ?>
     </section>
+
+    <div id="scroll-jump" class="scroll-jump">
+        <button type="button" id="scroll-up" class="scroll-jump-btn" aria-label="Subir para o topo" inert>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 14l6-6 6 6" />
+            </svg>
+        </button>
+        <button type="button" id="scroll-down" class="scroll-jump-btn"
+            aria-label="Descer para as mensagens mais recentes" inert>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 10l6 6 6-6" />
+            </svg>
+        </button>
+    </div>
 </main>
 <?php include_once __DIR__ . '/../includes/rodape.php'; ?>

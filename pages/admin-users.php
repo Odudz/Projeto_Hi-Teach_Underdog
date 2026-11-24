@@ -1,11 +1,13 @@
 <?php
 include_once __DIR__ . '/../config/conexao.php';
 require_once __DIR__ . '/../includes/rbac.php';
+require_once __DIR__ . '/../includes/recovery.php';
 require_once __DIR__ . '/../includes/ui-helpers.php';
 require_once __DIR__ . '/../includes/ui-icons.php';
 
 ensureAdmin();
 rbacEnsureSchema($pdo);
+recoveryEnsureColumn($pdo);
 
 const USERS_PER_PAGE = 25;
 
@@ -75,8 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $pdo->prepare('UPDATE users SET role = ? WHERE id = ?')->execute([$newRole, $targetId]);
                 rbacAudit(
-                    $pdo, (int) $user['id'], 'ROLE_CHANGED', 'user', $targetId,
-                    ['role' => $target['role']], ['role' => $newRole], $reason
+                    $pdo,
+                    (int) $user['id'],
+                    'ROLE_CHANGED',
+                    'user',
+                    $targetId,
+                    ['role' => $target['role']],
+                    ['role' => $newRole],
+                    $reason
                 );
                 $pdo->commit();
 
@@ -93,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-    // 2. Ativar / Desativar Conta
+        // 2. Ativar / Desativar Conta
     } elseif ($action === 'toggle_active') {
         try {
             $pdo->beginTransaction();
@@ -115,18 +123,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $newActivate = (int) $target['activate'] === 1 ? 0 : 1;
-            $pdo->prepare('UPDATE users SET activate = ? WHERE id = ?')->execute([$newActivate, $targetId]);
+            $newDeactivatedBy = $newActivate === 0 ? 'admin' : null;
+            $pdo->prepare('UPDATE users SET activate = ?, deactivated_by = ? WHERE id = ?')
+                ->execute([$newActivate, $newDeactivatedBy, $targetId]);
 
             $auditAction = $newActivate === 1 ? 'USER_ACTIVATED' : 'USER_DEACTIVATED';
             rbacAudit(
-                $pdo, (int) $user['id'], $auditAction, 'user', $targetId,
-                ['activate' => (int) $target['activate']], ['activate' => $newActivate], $reason
+                $pdo,
+                (int) $user['id'],
+                $auditAction,
+                'user',
+                $targetId,
+                ['activate' => (int) $target['activate']],
+                ['activate' => $newActivate],
+                $reason
             );
 
             $pdo->commit();
             setFlash('success', $newActivate === 1
                 ? "A conta de {$target['name']} foi reativada com sucesso."
-                : "A conta de {$target['name']} foi desativada.");
+                : "A conta de {$target['name']} foi desativada pela administração.");
         } catch (RuntimeException $e) {
             $pdo->rollBack();
             setFlash('error', $e->getMessage());
@@ -175,7 +191,7 @@ $page = min($page, $totalPages);
 $offset = ($page - 1) * USERS_PER_PAGE;
 
 $listStmt = $pdo->prepare(
-    "SELECT id, name, email, phone, cpf, role, activate, created_at, last_login_at 
+    "SELECT id, name, email, phone, cpf, role, activate, deactivated_by, created_at, last_login_at 
      FROM users 
      $whereSql 
      ORDER BY id DESC 
@@ -219,7 +235,19 @@ function formatCpf(string $cpf): string
 /** Resumo legível de uma alteração registrada na auditoria (ex.: "Cargo: Aluno → Professor"). */
 function apDiff(?string $old, ?string $new): string
 {
-    $labels = ['role' => 'Cargo', 'activate' => 'Conta'];
+    $labels = [
+        'role'      => 'Cargo',
+        'activate'  => 'Conta',
+        'name'      => 'Nome',
+        'title'     => 'Título',
+        'published' => 'Publicado',
+        'status'    => 'Status',
+        'type'      => 'Sanção',
+        'days'      => 'Dias',
+        'author_id' => 'Autor #',
+        'topic_id'  => 'Fórum #',
+        'body'      => 'Conteúdo',
+    ];
     $before = json_decode((string) $old, true);
     $after = json_decode((string) $new, true);
 
@@ -285,10 +313,12 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         <div class="ap-hero-text">
             <div class="ap-hero-top"><?= uiRoleBadge('admin') ?></div>
             <h1 class="ap-title">Usuários e cargos</h1>
-            <p class="ap-subtitle">Controle de acessos, papéis de usuários, ativação de contas e auditoria das ações da equipe.</p>
+            <p class="ap-subtitle">Controle de acessos, papéis de usuários, ativação de contas e auditoria das ações da
+                equipe.</p>
         </div>
         <div class="ap-hero-actions">
-            <a class="button button-small" href="moderator-dashboard.php"><?= uiIcon('overview', 16) ?>Painel da administração</a>
+            <a class="button button-small" href="moderator-dashboard.php"><?= uiIcon('overview', 16) ?>Painel da
+                administração</a>
             <a class="button button-small" href="moderation.php"><?= uiIcon('shield', 16) ?>Fila de moderação</a>
         </div>
     </header>
@@ -310,7 +340,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <div class="ap-panel-head">
                     <div>
                         <h2 class="ap-panel-title">Contas e acessos <span class="chip"><?= $totalUsers ?></span></h2>
-                        <p class="ap-panel-sub">Clique em um usuário para alterar o cargo ou ativar/desativar a conta. Toda ação exige um motivo e fica registrada.</p>
+                        <p class="ap-panel-sub">Clique em um usuário para alterar o cargo ou ativar/desativar a conta.
+                            Toda ação exige um motivo e fica registrada.</p>
                     </div>
                 </div>
 
@@ -326,21 +357,26 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <form class="ap-filter" action="admin-users.php" method="get" role="search">
                     <label class="ap-search">
                         <?= uiIcon('search', 18) ?><span class="ui-sr">Buscar usuário</span>
-                        <input type="search" name="q" class="form-input" maxlength="100" placeholder="Nome, e-mail ou CPF" value="<?= e($search) ?>">
+                        <input type="search" name="q" class="form-input" maxlength="100"
+                            placeholder="Nome, e-mail ou CPF" value="<?= e($search) ?>">
                     </label>
                     <select name="role" class="form-input" aria-label="Filtrar por cargo">
                         <option value="">Todos os cargos</option>
                         <?php foreach (RBAC_ROLES as $r): ?>
-                            <option value="<?= e($r) ?>"<?= $filterRole === $r ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
+                            <option value="<?= e($r) ?>" <?= $filterRole === $r ? ' selected' : '' ?>>
+                                <?= e(rbacRoleLabel($r)) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <select name="status" class="form-input" aria-label="Filtrar por status">
                         <option value="">Todos os status</option>
-                        <option value="active"<?= $filterStatus === 'active' ? ' selected' : '' ?>>Apenas ativos</option>
-                        <option value="inactive"<?= $filterStatus === 'inactive' ? ' selected' : '' ?>>Apenas desativados</option>
+                        <option value="active" <?= $filterStatus === 'active' ? ' selected' : '' ?>>Apenas ativos
+                        </option>
+                        <option value="inactive" <?= $filterStatus === 'inactive' ? ' selected' : '' ?>>Apenas
+                            desativados</option>
                     </select>
                     <button type="submit" class="button button-primary button-small">Filtrar</button>
-                    <?php if ($hasFilters): ?><a href="admin-users.php" class="button button-small">Limpar</a><?php endif; ?>
+                    <?php if ($hasFilters): ?><a href="admin-users.php"
+                            class="button button-small">Limpar</a><?php endif; ?>
                 </form>
 
                 <?php if (!$users): ?>
@@ -351,6 +387,13 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                             $uid = (int) $row['id'];
                             $isSelf = $uid === (int) $user['id'];
                             $isActive = (int) $row['activate'] === 1;
+                            if ($isActive) {
+                                $statusLabel = 'Ativa';
+                            } elseif (($row['deactivated_by'] ?? null) === 'admin') {
+                                $statusLabel = 'Desativada (Admin)';
+                            } else {
+                                $statusLabel = 'Desativada (Usuário)';
+                            }
                             $summary = '<span class="avatar">' . e(uiInitials((string) $row['name'])) . '</span>';
                         ?>
                             <li class="ap-user">
@@ -361,78 +404,116 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                             <strong class="ui-ellipsis"><?= e($row['name']) ?></strong>
                                             <small class="ui-ellipsis"><?= e($row['email']) ?> · #<?= $uid ?></small>
                                         </span>
-                                        <span class="ap-user-chips"><?= uiRoleBadge((string) $row['role']) ?><span class="chip chip-muted">Sua conta atual</span></span>
+                                        <span class="ap-user-chips"><?= uiRoleBadge((string) $row['role']) ?><span
+                                                class="chip chip-muted">Sua conta atual</span></span>
                                     </div>
                                 <?php else: ?>
                                     <details class="ui-details ap-user-details">
                                         <summary>
                                             <?= $summary ?>
                                             <span class="ap-user-id">
-                                                <strong class="ui-ellipsis" title="<?= e($row['name']) ?>"><?= e($row['name']) ?></strong>
-                                                <small class="ui-ellipsis" title="<?= e($row['email']) ?>"><?= e($row['email']) ?> · #<?= $uid ?></small>
+                                                <strong class="ui-ellipsis"
+                                                    title="<?= e($row['name']) ?>"><?= e($row['name']) ?></strong>
+                                                <small class="ui-ellipsis" title="<?= e($row['email']) ?>"><?= e($row['email']) ?> ·
+                                                    #<?= $uid ?></small>
                                             </span>
                                             <span class="ap-user-chips">
                                                 <?= uiRoleBadge((string) $row['role']) ?>
-                                                <span class="chip <?= $isActive ? 'chip-primary' : 'chip-danger' ?>"><?= $isActive ? 'Ativa' : 'Desativada' ?></span>
+                                                <span
+                                                    class="chip <?= $isActive ? 'chip-primary' : 'chip-danger' ?>"><?= e($statusLabel) ?></span>
                                             </span>
-                                            <span class="ap-user-manage"><span>Gerenciar</span><span class="ui-chevron" aria-hidden="true"></span></span>
+                                            <span class="ap-user-manage"><span>Gerenciar</span><span class="ui-chevron"
+                                                    aria-hidden="true"></span></span>
                                         </summary>
-                                        <div class="ui-details-body"><div class="ui-details-inner ap-manage-grid">
+                                        <div class="ui-details-body">
+                                            <div class="ui-details-inner ap-manage-grid">
 
-                                            <div class="ap-manage-box">
-                                                <h4>Dados da conta</h4>
-                                                <dl class="ap-facts">
-                                                    <div><dt>Perfil:</dt><dd><a href="profile-view.php?id=<?= $uid ?>">Abrir perfil</a></dd></div>
-                                                    <div><dt>Telefone:</dt><dd><?= e($row['phone'] ?: 'Sem telefone') ?></dd></div>
-                                                    <div><dt>CPF:</dt><dd><?= e(formatCpf((string) $row['cpf'])) ?></dd></div>
-                                                    <div><dt>Cadastro:</dt><dd><?= e(date('d/m/Y H:i', strtotime((string) $row['created_at']))) ?></dd></div>
-                                                    <div><dt>Último acesso:</dt><dd><?= !empty($row['last_login_at']) ? e(date('d/m/Y H:i', strtotime((string) $row['last_login_at']))) : 'Nunca' ?></dd></div>
-                                                </dl>
+                                                <div class="ap-manage-box">
+                                                    <h4>Dados da conta</h4>
+                                                    <dl class="ap-facts">
+                                                        <div>
+                                                            <dt>Perfil:</dt>
+                                                            <dd><a href="profile-view.php?id=<?= $uid ?>">Abrir perfil</a></dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>Telefone:</dt>
+                                                            <dd><?= e($row['phone'] ?: 'Sem telefone') ?></dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>CPF:</dt>
+                                                            <dd><?= e(formatCpf((string) $row['cpf'])) ?></dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>Cadastro:</dt>
+                                                            <dd><?= e(date('d/m/Y H:i', strtotime((string) $row['created_at']))) ?>
+                                                            </dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt>Último acesso:</dt>
+                                                            <dd><?= !empty($row['last_login_at']) ? e(date('d/m/Y H:i', strtotime((string) $row['last_login_at']))) : 'Nunca' ?>
+                                                            </dd>
+                                                        </div>
+                                                    </dl>
+                                                </div>
+
+                                                <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>"
+                                                    method="post">
+                                                    <h4>Alterar cargo</h4>
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="change_role">
+                                                    <input type="hidden" name="user_id" value="<?= $uid ?>">
+                                                    <label class="ui-field">
+                                                        <span class="ui-field-top"><span class="ui-field-label">Novo
+                                                                cargo</span></span>
+                                                        <select name="role" class="form-input">
+                                                            <?php foreach (RBAC_ROLES as $r): ?>
+                                                                <option value="<?= e($r) ?>"
+                                                                    <?= $r === $row['role'] ? ' selected' : '' ?>>
+                                                                    <?= e(rbacRoleLabel($r)) ?></option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    </label>
+                                                    <label class="ui-field">
+                                                        <span class="ui-field-top"><span class="ui-field-label">Motivo
+                                                                *</span></span>
+                                                        <input type="text" name="reason" class="form-input" minlength="5"
+                                                            maxlength="255" placeholder="Ex.: Promovido para auxiliar na moderação"
+                                                            required autocomplete="off">
+                                                    </label>
+                                                    <div class="ui-actions">
+                                                        <button type="submit" class="button button-primary button-small"
+                                                            data-confirm="O cargo de <?= e(mb_strimwidth((string) $row['name'], 0, 50, '…')) ?> será alterado e a ação ficará registrada na auditoria."
+                                                            data-confirm-title="Confirmar mudança de cargo?"
+                                                            data-confirm-yes="Alterar cargo">Confirmar cargo</button>
+                                                    </div>
+                                                </form>
+
+                                                <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>"
+                                                    method="post">
+                                                    <h4><?= $isActive ? 'Desativar conta' : 'Reativar conta' ?></h4>
+                                                    <?= csrfInput() ?>
+                                                    <input type="hidden" name="action" value="toggle_active">
+                                                    <input type="hidden" name="user_id" value="<?= $uid ?>">
+                                                    <label class="ui-field">
+                                                        <span class="ui-field-top"><span class="ui-field-label">Motivo
+                                                                <?= $isActive ? 'da desativação' : 'da reativação' ?>
+                                                                *</span></span>
+                                                        <input type="text" name="reason" class="form-input" minlength="5"
+                                                            maxlength="255" placeholder="Explique o motivo desta ação" required
+                                                            autocomplete="off">
+                                                    </label>
+                                                    <div class="ui-actions">
+                                                        <button type="submit"
+                                                            class="button button-small <?= $isActive ? 'button-delete' : 'button-primary' ?>"
+                                                            data-confirm="<?= $isActive ? e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' perderá o acesso e não poderá reativar a conta pela frase recuperadora.' : e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' voltará a ter acesso à plataforma.' ?>"
+                                                            data-confirm-title="<?= $isActive ? 'Desativar conta?' : 'Reativar conta?' ?>"
+                                                            data-confirm-yes="<?= $isActive ? 'Desativar' : 'Reativar' ?>"
+                                                            <?= $isActive ? 'data-confirm-tone="danger"' : '' ?>><?= $isActive ? 'Confirmar desativação' : 'Confirmar reativação' ?></button>
+                                                    </div>
+                                                </form>
+
                                             </div>
-
-                                            <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>" method="post">
-                                                <h4>Alterar cargo</h4>
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="change_role">
-                                                <input type="hidden" name="user_id" value="<?= $uid ?>">
-                                                <label class="ui-field">
-                                                    <span class="ui-field-top"><span class="ui-field-label">Novo cargo</span></span>
-                                                    <select name="role" class="form-input">
-                                                        <?php foreach (RBAC_ROLES as $r): ?>
-                                                            <option value="<?= e($r) ?>"<?= $r === $row['role'] ? ' selected' : '' ?>><?= e(rbacRoleLabel($r)) ?></option>
-                                                        <?php endforeach; ?>
-                                                    </select>
-                                                </label>
-                                                <label class="ui-field">
-                                                    <span class="ui-field-top"><span class="ui-field-label">Motivo *</span></span>
-                                                    <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Ex.: Promovido para auxiliar na moderação" required autocomplete="off">
-                                                </label>
-                                                <div class="ui-actions">
-                                                    <button type="submit" class="button button-primary button-small"
-                                                        data-confirm="O cargo de <?= e(mb_strimwidth((string) $row['name'], 0, 50, '…')) ?> será alterado e a ação ficará registrada na auditoria."
-                                                        data-confirm-title="Confirmar mudança de cargo?" data-confirm-yes="Alterar cargo">Confirmar cargo</button>
-                                                </div>
-                                            </form>
-
-                                            <form class="ap-manage-box ui-form" action="admin-users.php<?= e($formQuery) ?>" method="post">
-                                                <h4><?= $isActive ? 'Desativar conta' : 'Reativar conta' ?></h4>
-                                                <?= csrfInput() ?>
-                                                <input type="hidden" name="action" value="toggle_active">
-                                                <input type="hidden" name="user_id" value="<?= $uid ?>">
-                                                <label class="ui-field">
-                                                    <span class="ui-field-top"><span class="ui-field-label">Motivo <?= $isActive ? 'da desativação' : 'da reativação' ?> *</span></span>
-                                                    <input type="text" name="reason" class="form-input" minlength="5" maxlength="255" placeholder="Explique o motivo desta ação" required autocomplete="off">
-                                                </label>
-                                                <div class="ui-actions">
-                                                    <button type="submit" class="button button-small <?= $isActive ? 'button-delete' : 'button-primary' ?>"
-                                                        data-confirm="<?= $isActive ? e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' perderá o acesso à plataforma.' : e(mb_strimwidth((string) $row['name'], 0, 50, '…')) . ' voltará a ter acesso à plataforma.' ?>"
-                                                        data-confirm-title="<?= $isActive ? 'Desativar conta?' : 'Reativar conta?' ?>"
-                                                        data-confirm-yes="<?= $isActive ? 'Desativar' : 'Reativar' ?>"
-                                                        <?= $isActive ? 'data-confirm-tone="danger"' : '' ?>><?= $isActive ? 'Confirmar desativação' : 'Confirmar reativação' ?></button>
-                                                </div>
-                                            </form>
-
-                                        </div></div>
+                                        </div>
                                     </details>
                                 <?php endif; ?>
                             </li>
@@ -441,16 +522,18 @@ include_once __DIR__ . '/../includes/cabecalho.php';
 
                     <?php if ($totalPages > 1): ?>
                         <nav class="ap-pager" aria-label="Paginação de usuários">
-                            <?php $previous = 0; foreach ($pageWindow as $i):
-                                if ($previous && $i - $previous > 1): ?><span class="ap-page" aria-hidden="true">…</span><?php endif;
-                                $previous = $i;
-                                $pageUrl = 'admin-users.php?' . http_build_query(array_merge($queryParameters, ['page' => $i])) . '#users-section';
-                                if ($i === $page): ?>
+                            <?php $previous = 0;
+                            foreach ($pageWindow as $i):
+                                if ($previous && $i - $previous > 1): ?><span class="ap-page"
+                                        aria-hidden="true">…</span><?php endif;
+                                                                $previous = $i;
+                                                                $pageUrl = 'admin-users.php?' . http_build_query(array_merge($queryParameters, ['page' => $i])) . '#users-section';
+                                                                if ($i === $page): ?>
                                     <strong class="ap-page is-active" aria-current="page"><?= $i ?></strong>
                                 <?php else: ?>
                                     <a class="ap-page" href="<?= e($pageUrl) ?>"><?= $i ?></a>
-                                <?php endif;
-                            endforeach; ?>
+                            <?php endif;
+                                                            endforeach; ?>
                         </nav>
                     <?php endif; ?>
                 <?php endif; ?>
@@ -469,11 +552,13 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                     <select name="audit_act" class="form-input" aria-label="Filtrar por ação">
                         <option value="">Todas as ações</option>
                         <?php foreach ($distinctActions as $act): ?>
-                            <option value="<?= e($act) ?>"<?= $auditActionFilter === $act ? ' selected' : '' ?>><?= e(uiAuditLabel((string) $act)) ?></option>
+                            <option value="<?= e($act) ?>" <?= $auditActionFilter === $act ? ' selected' : '' ?>>
+                                <?= e(uiAuditLabel((string) $act)) ?></option>
                         <?php endforeach; ?>
                     </select>
                     <button type="submit" class="button button-small button-primary">Filtrar</button>
-                    <?php if ($auditActionFilter !== ''): ?><a href="admin-users.php#audit-section" class="button button-small">Limpar</a><?php endif; ?>
+                    <?php if ($auditActionFilter !== ''): ?><a href="admin-users.php#audit-section"
+                            class="button button-small">Limpar</a><?php endif; ?>
                 </form>
 
                 <?php if (!$logs): ?>
@@ -490,19 +575,18 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                                     <div class="ap-log-head">
                                         <strong><?= e($log['actor_name'] ?? 'Sistema') ?></strong>
                                         <span class="chip chip-muted"><?= e(uiAuditLabel((string) $log['action'])) ?></span>
-                                        <span class="ap-muted">alvo: <?= e($log['target_name'] ?? ($log['target_type'] . ' #' . $log['target_id'])) ?></span>
+                                        <span class="ap-muted">alvo:
+                                            <?= e($log['target_name'] ?? ($log['target_type'] . ' #' . $log['target_id'])) ?></span>
                                     </div>
-                                    <div class="ap-log-diff"><?= e(apDiff($log['old_value'] ?? null, $log['new_value'] ?? null)) ?></div>
-                                    <?php if (!empty($log['reason'])): ?><p class="ap-log-reason"><strong>Motivo:</strong> <?= e($log['reason']) ?></p><?php endif; ?>
-                                    <?php if ($log['ip'] !== null): ?><span class="ap-log-ip">IP <?= e((string) @inet_ntop($log['ip'])) ?></span><?php endif; ?>
+                                    <div class="ap-log-diff">
+                                        <?= e(apDiff($log['old_value'] ?? null, $log['new_value'] ?? null)) ?></div>
+                                    <?php if (!empty($log['reason'])): ?><p class="ap-log-reason"><strong>Motivo:</strong>
+                                            <?= e($log['reason']) ?></p><?php endif; ?>
+                                    <?php if ($log['ip'] !== null): ?><span class="ap-log-ip">IP
+                                            <?= e((string) @inet_ntop($log['ip'])) ?></span><?php endif; ?>
                                 </div>
                             </li>
                         <?php endforeach; ?>
                     </ul>
                 <?php endif; ?>
             </section>
-
-        </div>
-    </div>
-</main>
-<?php include_once __DIR__ . '/../includes/rodape.php'; ?>

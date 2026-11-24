@@ -84,6 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $old = $content ? ['author_id' => (int) $content['user_id'], 'title' => $content['title'], 'body' => mb_substr($content['body'], 0, 2000)] : null;
                 }
 
+                // Conteúdo já removido: não marcar a denúncia como resolvida sem ação real.
+                if (!$content) {
+                    throw new RuntimeException('Este conteúdo já foi removido. Descarte a denúncia se não houver mais nada a fazer.');
+                }
+
                 if ($content) {
                     $pdo->prepare("DELETE FROM $table WHERE id = ?")->execute([$targetId]);
                     rbacAudit(
@@ -286,7 +291,7 @@ $canSanction = static function (array $report) use ($user): bool {
 
 $pageId = 'moderation';
 $pageTitle = 'Fila de Moderação';
-$extraCss = ['tabs', 'staff'];
+$extraCss = ['tabs', 'staff', 'contacts'];
 $extraJs = ['tabs', 'staff'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';

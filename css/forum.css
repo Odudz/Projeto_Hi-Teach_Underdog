@@ -25,8 +25,8 @@
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: calc(48px * var(--ui-eff));
+  height: calc(48px * var(--ui-eff));
   overflow: hidden;
   background: var(--color-secondary);
   color: var(--color-text);
@@ -91,7 +91,7 @@
 }
 .chat-time,
 .chat-edited {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-eff));
   opacity: 0.75;
 }
 .chat-edited {
@@ -102,7 +102,7 @@
   background: var(--color-background);
   border: 2px solid var(--color-border);
   border-radius: 20px;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-eff));
   font-weight: 700;
 }
 .chat-text {
@@ -124,8 +124,8 @@
 .chat-action {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: calc(34px * var(--ui-eff));
+  height: calc(34px * var(--ui-eff));
   padding: 0;
   background: var(--color-background);
   color: var(--color-text);
@@ -177,14 +177,14 @@ textarea.chat-input {
 .emoji-toggle {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: calc(44px * var(--ui-eff));
+  height: calc(44px * var(--ui-eff));
   padding: 0;
   background: var(--color-background);
   border: var(--border);
   border-radius: 50%;
   box-shadow: var(--shadow-sm);
-  font-size: 22px;
+  font-size: calc(22px * var(--text-eff));
   line-height: 1;
   cursor: pointer;
   transition: transform var(--duration-base) var(--ease-bounce);
@@ -198,10 +198,10 @@ textarea.chat-input {
   position: absolute;
   bottom: calc(100% + var(--space-2));
   left: 0;
-  z-index: 60;
+  z-index: var(--z-dropdown);
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  gap: 2px;
+  gap: calc(2px * var(--ui-eff));
   width: min(340px, 82vw);
   max-height: 224px;
   padding: var(--space-2);
@@ -216,11 +216,11 @@ textarea.chat-input {
   display: none;
 }
 .emoji-item {
-  padding: 4px;
+  padding: calc(4px * var(--ui-eff));
   background: none;
   border: 0;
   border-radius: 8px;
-  font-size: 22px;
+  font-size: calc(22px * var(--text-eff));
   line-height: 1.2;
   cursor: pointer;
 }
@@ -333,8 +333,8 @@ textarea.chat-input {
 .forum-hero-deco-c {
   top: 46%;
   right: 24%;
-  width: 34px;
-  height: 34px;
+  width: calc(34px * var(--ui-eff));
+  height: calc(34px * var(--ui-eff));
   background: var(--color-background);
   border-radius: 50%;
 }
@@ -359,8 +359,8 @@ textarea.chat-input {
     text-align: center;
   }
   .chat-avatar {
-    width: 40px;
-    height: 40px;
+    width: calc(40px * var(--ui-eff));
+    height: calc(40px * var(--ui-eff));
   }
   .chat-message {
     max-width: 100%;
@@ -379,8 +379,8 @@ textarea.chat-input {
 .forum-back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px var(--space-2) 4px var(--space-1);
+  gap: calc(4px * var(--ui-eff));
+  padding: calc(4px * var(--ui-eff)) var(--space-2) calc(4px * var(--ui-eff)) var(--space-1);
   background: var(--color-background);
   color: inherit;
   border: 2px solid var(--color-border);
@@ -409,10 +409,10 @@ textarea.chat-input {
   align-items: center;
   justify-content: center;
   align-self: center;
-  min-height: 28px;
+  min-height: calc(28px * var(--ui-eff));
   max-width: 100%;
-  gap: 6px;
-  padding: 4px var(--space-2);
+  gap: calc(6px * var(--ui-eff));
+  padding: calc(4px * var(--ui-eff)) var(--space-2);
   background: var(--color-background);
   border: 2px solid var(--color-border);
   border-radius: 999px;
@@ -427,8 +427,8 @@ textarea.chat-input {
 .forum-chip-status::before {
   content: "";
   flex-shrink: 0;
-  width: 9px;
-  height: 9px;
+  width: calc(9px * var(--ui-eff));
+  height: calc(9px * var(--ui-eff));
   background: var(--color-primary);
   border: 2px solid var(--color-border);
   border-radius: 50%;
@@ -461,8 +461,8 @@ textarea.chat-input {
   font-size: var(--font-size-sm);
 }
 .forum-hero-by .chat-avatar {
-  width: 44px;
-  height: 44px;
+  width: calc(44px * var(--ui-eff));
+  height: calc(44px * var(--ui-eff));
 }
 .forum-hero-by time {
   opacity: 0.8;
@@ -543,25 +543,6 @@ textarea.chat-input {
   margin-top: var(--space-1);
 }
 
-@keyframes forum-hero-in {
-  from {
-    opacity: 0;
-    translate: 0 14px;
-  }
-  to {
-    opacity: 1;
-    translate: 0 0;
-  }
-}
-@keyframes forum-float {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 -9px;
-  }
-}
 @keyframes forum-bump {
   0% {
     transform: scale(1);
@@ -684,6 +665,10 @@ textarea.chat-input.write-area:focus {
   box-shadow: none;
   outline: none;
 }
+.write-sheet:focus-within {
+  outline: var(--border-width) solid var(--color-primary);
+  outline-offset: 3px;
+}
 .write-tools {
   gap: var(--space-3);
   padding-top: var(--space-3);
@@ -729,28 +714,6 @@ textarea.chat-input.write-area:focus {
   }
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-.dm-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 26px;
-  padding: 0 8px;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  border-radius: 999px;
-  font-size: var(--font-size-sm);
-  vertical-align: middle;
-}
 .form-label-row {
   display: flex;
   align-items: baseline;
@@ -782,7 +745,7 @@ textarea.chat-input.write-area:focus {
 }
 .forum-search .form-input {
   flex: 1;
-  padding-left: 44px;
+  padding-left: calc(44px * var(--ui-eff));
 }
 .forum-chips {
   display: flex;
@@ -790,7 +753,7 @@ textarea.chat-input.write-area:focus {
   gap: var(--space-2);
 }
 .forum-filter {
-  padding: 4px var(--space-3);
+  padding: calc(4px * var(--ui-eff)) var(--space-3);
   background: var(--color-surface);
   color: inherit;
   border: 2px solid var(--color-border);
@@ -960,7 +923,7 @@ a.forum-tile-link:focus-visible {
 .forum-tile-count {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: calc(4px * var(--ui-eff));
 }
 .forum-tile-time {
   opacity: 0.7;
@@ -969,13 +932,13 @@ a.forum-tile-link:focus-visible {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: calc(30px * var(--ui-eff));
+  height: calc(30px * var(--ui-eff));
   object-fit: cover;
   background: var(--color-secondary);
   border: 2px solid var(--color-border);
   border-radius: 50%;
-  font-size: 14px;
+  font-size: calc(14px * var(--text-eff));
   font-weight: 900;
 }
 .forum-tile [data-preview-title].is-placeholder,
@@ -1008,8 +971,8 @@ a.forum-tile-link:focus-visible {
 .forum-page {
   display: grid;
   place-items: center;
-  min-width: 42px;
-  height: 42px;
+  min-width: calc(42px * var(--ui-eff));
+  height: calc(42px * var(--ui-eff));
   padding: 0 var(--space-2);
   background: var(--color-surface);
   color: inherit;
@@ -1140,26 +1103,26 @@ a.forum-page:focus-visible {
   display: flex;
   align-items: center;
   margin: 0;
-  padding: 0 0 0 10px;
+  padding: 0 0 0 calc(10px * var(--ui-eff));
   list-style: none;
 }
 .topic-people li {
   display: grid;
-  margin-left: -10px;
+  margin-left: calc(-10px * var(--ui-eff));
   transition: transform var(--duration-base) var(--ease-bounce);
 }
 .topic-people li:hover {
   transform: translateY(-3px);
 }
 .topic-people .chat-avatar {
-  width: 38px;
-  height: 38px;
+  width: calc(38px * var(--ui-eff));
+  height: calc(38px * var(--ui-eff));
 }
 .topic-people-more {
   place-items: center;
-  min-width: 38px;
-  height: 38px;
-  padding: 0 6px;
+  min-width: calc(38px * var(--ui-eff));
+  height: calc(38px * var(--ui-eff));
+  padding: 0 calc(6px * var(--ui-eff));
   background: var(--color-background);
   border: 2px solid var(--color-border);
   border-radius: 999px;
@@ -1221,9 +1184,6 @@ a.forum-page:focus-visible {
 
 #topic-messages .chat-list {
   min-height: 160px;
-  max-height: min(65vh, 640px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: var(--space-4);
   background-color: var(--color-background);
   background-image: radial-gradient(
@@ -1236,7 +1196,116 @@ a.forum-page:focus-visible {
 }
 @media (max-width: 640px) {
   #topic-messages .chat-list {
-    max-height: 60vh;
     padding: var(--space-3);
   }
+}
+
+/* ---------- Resposta do fórum: fixa na base, sem rolagem interna ---------- */
+/* A conversa cresce junto com a página (só uma barra de rolagem). A caixa de
+   resposta fica grudada na base da tela, começa compacta e expande ao digitar. */
+#topic-reply {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  padding: var(--space-4) 0 calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--color-background) var(--space-5)
+  );
+}
+#topic-reply .write-sheet {
+  margin-bottom: 0;
+}
+#topic-reply .write-area {
+  height: calc(56px * var(--ui-eff));
+  min-height: calc(56px * var(--ui-eff));
+  resize: none;
+  transition: height var(--duration-base) var(--ease-out);
+}
+#topic-reply .write-sheet:focus-within .write-area,
+#topic-reply .write-sheet:has(.write-area:not(:placeholder-shown)) .write-area {
+  height: calc(170px * var(--ui-eff));
+}
+#topic-reply .write-sheet:not(:focus-within):has(.write-area:placeholder-shown) {
+  padding: var(--space-2) var(--space-3);
+  gap: 0;
+}
+#topic-reply .write-sheet:not(:focus-within):has(.write-area:placeholder-shown) .write-tools {
+  padding-top: 0;
+  border-top: 0;
+}
+#topic-reply .write-sheet:not(:focus-within):has(.write-area:placeholder-shown) .write-tools .field-counter,
+#topic-reply .write-sheet:not(:focus-within):has(.write-area:placeholder-shown) .write-tools .write-send {
+  display: none;
+}
+@media (max-width: 640px) {
+  #topic-reply {
+    padding-top: var(--space-3);
+  }
+  #topic-reply .write-sheet:focus-within .write-area,
+  #topic-reply .write-sheet:has(.write-area:not(:placeholder-shown)) .write-area {
+    height: calc(130px * var(--ui-eff));
+  }
+}
+
+/* ---------- Setas de navegação rápida do fórum (subir / descer) ---------- */
+.scroll-jump {
+  position: fixed;
+  right: var(--space-3);
+  bottom: 140px;
+  z-index: var(--z-floating);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+/* Posição real é definida por js/scroll-jump.js, colada à caixa de resposta */
+.scroll-jump[data-mode="side"] {
+  right: auto;
+}
+.scroll-jump-btn {
+  display: grid;
+  place-items: center;
+  width: calc(48px * var(--ui-eff));
+  height: calc(48px * var(--ui-eff));
+  padding: 0;
+  color: var(--color-surface);
+  background: var(--color-primary);
+  border: var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(16px) scale(0.4);
+  transition:
+    opacity var(--duration-base) ease,
+    transform var(--duration-slow) var(--ease-bounce),
+    box-shadow var(--duration-fast) ease;
+}
+.scroll-jump-btn svg {
+  width: 55%;
+  height: 55%;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.scroll-jump-btn.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
+}
+.scroll-jump-btn.is-visible:hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: var(--shadow-md);
+}
+.scroll-jump-btn.is-visible:active {
+  transform: scale(0.94);
+  box-shadow: none;
+}
+.scroll-jump-btn:focus-visible {
+  outline: var(--border-width) solid var(--color-primary);
+  outline-offset: 3px;
 }

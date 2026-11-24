@@ -1,0 +1,239 @@
+/* ============================================================
+   Hi Teach — Sala Virtual e Atividades (prefixo cr-)
+   Depende de ui-kit.css e subjects-hub.css.
+   ============================================================ */
+
+.cr-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--space-4);
+  align-items: start;
+}
+.cr-main,
+.cr-side,
+.cr-section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.cr-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border);
+}
+.cr-section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xl);
+}
+
+.cr-list {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cr-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+.cr-item:hover {
+  background: var(--color-surface-strong);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+.cr-item.is-done {
+  border-left: 8px solid var(--color-primary);
+}
+.cr-item.is-expired {
+  border-style: dashed;
+}
+
+.cr-ext {
+  display: grid;
+  place-items: center;
+  width: calc(52px * var(--ui-eff));
+  height: calc(52px * var(--ui-eff));
+  padding: calc(4px * var(--ui-eff));
+  font-size: calc(13px * var(--text-eff));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: var(--border);
+  border-radius: var(--radius);
+}
+.cr-ext--activity {
+  color: var(--color-text);
+  background: var(--color-secondary);
+}
+
+.cr-item-body {
+  display: grid;
+  gap: calc(4px * var(--ui-eff));
+  min-width: 0;
+}
+.cr-item-title {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.cr-item-title a {
+  text-decoration: none;
+}
+.cr-item-title a:hover {
+  text-decoration: underline;
+}
+.cr-item-sub {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+.cr-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6px * var(--ui-eff));
+  margin-top: calc(4px * var(--ui-eff));
+}
+.cr-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.cr-item-actions form {
+  margin: 0;
+}
+
+/* ---------- Hub de Salas Virtuais (classroom.php sem ?id=) ---------- */
+.cr-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+.cr-hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+.cr-hub-card:hover {
+  background: var(--color-surface-strong);
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-md);
+}
+.cr-hub-card.is-draft {
+  border-style: dashed;
+}
+.cr-hub-title {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.cr-hub-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 2px dashed var(--color-border);
+}
+
+/* ---------- Página da Atividade (activity.php) ---------- */
+.cr-statement {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.cr-feedback {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-background);
+  border-left: 5px solid var(--color-primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  overflow-wrap: anywhere;
+}
+.cr-answer-box {
+  padding: var(--space-3);
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+.cr-submissions {
+  display: grid;
+  gap: var(--space-3);
+}
+.cr-submission {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+.cr-submission-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cr-notice-warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  border: var(--border);
+  border-color: var(--color-danger);
+  border-radius: var(--radius);
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .cr-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .cr-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .cr-item-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

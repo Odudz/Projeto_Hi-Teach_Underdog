@@ -284,9 +284,31 @@
 			editUntil: editLeft > 0 ? now + editLeft * 1000 : 0,
 			deleteUntil: deleteLeft > 0 ? now + deleteLeft * 1000 : 0,
 		});
+		scheduleTick();
+	};
+
+	// Os prazos de editar/apagar são verificados só até o próximo vencimento:
+	// nada roda enquanto não houver prazo pendente (sem setInterval permanente).
+	let tickTimer = 0;
+	const nextDeadline = () => {
+		let next = 0;
+		messages.forEach((entry) => {
+			[entry.editUntil, entry.deleteUntil].forEach((until) => {
+				if (until && (!next || until < next)) next = until;
+			});
+		});
+		return next;
+	};
+	const scheduleTick = () => {
+		clearTimeout(tickTimer);
+		tickTimer = 0;
+		const next = nextDeadline();
+		if (!next) return;
+		tickTimer = window.setTimeout(tick, Math.max(50, next - Date.now() + 50));
 	};
 
 	const tick = () => {
+		tickTimer = 0;
 		const now = Date.now();
 		messages.forEach((entry) => {
 			if (entry.editUntil && now >= entry.editUntil) {
@@ -302,6 +324,7 @@
 				tidyActions(entry.item);
 			}
 		});
+		scheduleTick();
 	};
 
 	const reveal = (element) => {
@@ -390,7 +413,7 @@
 	if (!list) return;
 
 	list.querySelectorAll(".chat-message[data-post-id]").forEach(register);
-	setInterval(tick, 1000);
+	scheduleTick();
 
 	const removeMessage = (item) => {
 		const index = messages.findIndex((entry) => entry.item === item);

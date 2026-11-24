@@ -11,7 +11,9 @@ if (!$user || $user['role'] !== 'teacher') {
 $stmt = $pdo->prepare(
     'SELECT c.*, s.name AS subject_name,
             (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
-            (SELECT COUNT(*) FROM course_enrollments e WHERE e.course_id = c.id) AS student_count
+            (SELECT COUNT(*) FROM course_enrollments e WHERE e.course_id = c.id) AS student_count,
+            (SELECT COUNT(*) FROM course_materials m WHERE m.course_id = c.id) AS material_count,
+            (SELECT COUNT(*) FROM course_activities a WHERE a.course_id = c.id) AS activity_count
      FROM courses c 
      JOIN subjects s ON s.id = c.subject_id 
      WHERE c.teacher_id = ? 
@@ -28,10 +30,11 @@ $stmt = $pdo->prepare(
      JOIN courses c ON c.id = act.course_id
      JOIN users u ON u.id = sub.student_id
      WHERE c.teacher_id = ?
-     ORDER BY sub.submitted_at DESC LIMIT 50'
+     ORDER BY sub.grade IS NULL DESC, sub.submitted_at DESC LIMIT 50'
 );
 $stmt->execute([$user['id']]);
 $submissions = $stmt->fetchAll();
+$pendingGrades = count(array_filter($submissions, fn($s) => $s['grade'] === null));
 
 // 3. Fóruns criados pelo professor
 $stmt = $pdo->prepare(
@@ -47,7 +50,7 @@ $teacherTopics = $stmt->fetchAll();
 
 $pageId = 'teacher-dashboard';
 $pageTitle = 'Painel do Professor';
-$extraCss = ['tabs', 'staff'];
+$extraCss = ['tabs', 'staff', 'contacts'];
 $extraJs = ['tabs', 'staff'];
 $baseUrl = '../';
 include_once __DIR__ . '/../includes/cabecalho.php';
@@ -56,10 +59,11 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     <header class="staff-header">
         <div>
             <h1 class="staff-title">Painel do Professor</h1>
-            <p class="staff-subtitle">Gerencie seus cursos, salas de aula, avaliações e interações com os alunos.</p>
+            <p class="staff-subtitle">Gerencie seus cursos, salas virtuais, avaliações e interações com os alunos.</p>
         </div>
         <div class="staff-header-actions">
-            <a class="button button-primary button-small" href="subjects.php#course-create">Novo Curso</a>
+            <a class="button button-primary button-small" href="subjects.php?criar=1#course-create">Novo Curso</a>
+            <a class="button button-secondary button-small" href="classroom.php">Salas Virtuais</a>
             <a class="button button-secondary button-small" href="live-class.php">Iniciar Live</a>
         </div>
     </header>
@@ -72,7 +76,8 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                 <strong>Você ainda não criou nenhum curso.</strong>
                 <span>Cadastre seu primeiro curso para começar a adicionar aulas e materiais.</span>
                 <div style="margin-top: var(--space-2);">
-                    <a class="button button-primary button-small" href="subjects.php#course-create">Criar Primeiro Curso</a>
+                    <a class="button button-primary button-small" href="subjects.php?criar=1#course-create">Criar Primeiro
+                        Curso</a>
                 </div>
             </div>
         <?php else: ?>
@@ -91,9 +96,10 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                         </div>
                         <div
                             style="margin-top:var(--space-3); padding-top:var(--space-2); border-top:2px dashed var(--color-surface-strong);">
-                            <small class="item-note"><?= (int)$c['lesson_count'] ?> aula(s) · <?= (int)$c['student_count'] ?>
+                            <small class="item-note"><?= (int)$c['lesson_count'] ?> aula(s) · <?= (int)$c['material_count'] ?>
+                                material(is) · <?= (int)$c['activity_count'] ?> atividade(s) · <?= (int)$c['student_count'] ?>
                                 aluno(s)</small>
-                            <div style="display:flex; gap:var(--space-2); margin-top:var(--space-2);">
+                            <div style="display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-2);">
                                 <a class="button button-small button-primary"
                                     href="course.php?id=<?= (int)$c['id'] ?>">Gerenciar Aulas</a>
                                 <a class="button button-small button-secondary"
@@ -107,7 +113,7 @@ include_once __DIR__ . '/../includes/cabecalho.php';
     </section>
 
     <!-- ABA 2: RESPOSTAS E AVALIAÇÕES -->
-    <section class="section" data-tab="Avaliações" data-tab-badge="<?= count($submissions) ?>">
+    <section class="section" data-tab="Avaliações" data-tab-badge="<?= $pendingGrades ?>">
         <h2 class="section-title">Respostas e Atividades dos Alunos</h2>
         <?php if (!$submissions): ?>
             <div class="empty-state">
@@ -131,11 +137,11 @@ include_once __DIR__ . '/../includes/cabecalho.php';
                             <td class="table-cell"><?= e($sub['course_title']) ?></td>
                             <td class="table-cell"><?= e($sub['activity_title']) ?></td>
                             <td class="table-cell">
-                                <?= $sub['grade'] !== null ? '<span class="chip chip-primary">' . number_format((float)$sub['grade'], 1, ',', '') . ' / 10</span>' : '<span class="chip chip-muted">Pendente</span>' ?>
+                                <?= $sub['grade'] !== null ? '<span class="chip chip-primary">' . number_format((float)$sub['grade'], 1, ',', '') . ' / 10</span>' : '<span class="chip chip-danger">Pendente</span>' ?>
                             </td>
                             <td class="table-cell">
                                 <a class="button button-small button-primary"
-                                    href="../activity.php?id=<?= (int)$sub['activity_id'] ?>">Avaliar Resposta</a>
+                                    href="../activity.php?id=<?= (int)$sub['activity_id'] ?>"><?= $sub['grade'] === null ? 'Corrigir' : 'Ver / Editar' ?></a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -183,4 +189,4 @@ include_once __DIR__ . '/../includes/cabecalho.php';
         <?php endif; ?>
     </section>
 </main>
-<?php include_once __DIR__ . '/../includes/rodape.php'; ?>
+<?php include __DIR__ . '/../includes/rodape.php'; ?>

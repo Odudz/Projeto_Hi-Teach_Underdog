@@ -35,9 +35,9 @@
 
 .ui-sr {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
+  width: calc(1px * var(--ui-eff));
+  height: calc(1px * var(--ui-eff));
+  margin: calc(-1px * var(--ui-eff));
   padding: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
@@ -57,35 +57,7 @@
 }
 
 /* ---------- Chips (também usados pelo uiRoleBadge) ---------- */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  padding: 2px 10px;
-  overflow: hidden;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.6;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--color-text);
-  background: var(--color-surface-strong);
-  border: 2px solid var(--color-border);
-  border-radius: 999px;
-}
-.chip-primary { background: var(--color-primary); color: var(--color-on-primary); }
-.chip-accent { background: var(--color-secondary); color: var(--color-text); }
-.chip-danger { background: var(--color-danger); color: var(--color-on-danger); }
-.chip-muted { background: transparent; }
-.chip-draft { background: transparent; border-style: dashed; }
-
 /* ---------- Botões extras ---------- */
-.button-small {
-  padding: 2px var(--space-3);
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-sm);
-}
 .button-small:hover { box-shadow: var(--shadow-md); }
 .button-block { display: block; width: 100%; text-align: center; }
 .button[disabled],
@@ -95,7 +67,7 @@
   transform: none;
   box-shadow: var(--shadow-sm);
 }
-.button .ui-icon { margin-right: 6px; margin-top: -2px; }
+.button .ui-icon { margin-right: calc(6px * var(--ui-eff)); margin-top: calc(-2px * var(--ui-eff)); }
 
 /* ---------- Painel / cartão base ---------- */
 .ui-panel {
@@ -143,7 +115,7 @@
 
 .ui-field {
   display: grid;
-  gap: 6px;
+  gap: calc(6px * var(--ui-eff));
   min-width: 0;
   font-weight: 700;
 }
@@ -155,7 +127,7 @@
   min-width: 0;
 }
 .ui-field-label { min-width: 0; overflow-wrap: anywhere; }
-.ui-field-hint { font-size: 13px; font-weight: 400; opacity: 0.7; }
+.ui-field-hint { font-size: calc(13px * var(--text-eff)); font-weight: 400; opacity: 0.7; }
 
 .ui-field .form-input,
 .ui-field select,
@@ -179,7 +151,7 @@
 
 .ui-counter {
   flex: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--text-eff));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -247,11 +219,11 @@
 .ui-summary-main {
   display: grid;
   flex: 1 1 auto;
-  gap: 2px;
+  gap: calc(2px * var(--ui-eff));
   min-width: 0;
 }
 .ui-summary-main strong { overflow-wrap: anywhere; }
-.ui-summary-main small { font-size: 14px; font-weight: 400; opacity: 0.75; overflow-wrap: anywhere; }
+.ui-summary-main small { font-size: calc(14px * var(--text-eff)); font-weight: 400; opacity: 0.75; overflow-wrap: anywhere; }
 
 .ui-summary-icon {
   display: inline-flex;
@@ -271,16 +243,16 @@
 /* Seta indicadora feita só com CSS */
 .ui-chevron {
   flex: none;
-  width: 10px;
-  height: 10px;
-  margin: 0 4px 3px auto;
+  width: calc(10px * var(--ui-eff));
+  height: calc(10px * var(--ui-eff));
+  margin: 0 calc(4px * var(--ui-eff)) calc(3px * var(--ui-eff)) auto;
   border-right: 3px solid currentColor;
   border-bottom: 3px solid currentColor;
   transform: rotate(45deg);
   transition: transform var(--duration-base) var(--ease-out);
 }
 .ui-details.is-open > summary .ui-chevron {
-  margin-bottom: -3px;
+  margin-bottom: calc(-3px * var(--ui-eff));
   transform: rotate(225deg);
 }
 

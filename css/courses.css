@@ -54,8 +54,8 @@
 .course-subject-icon {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: calc(54px * var(--ui-eff));
+  height: calc(54px * var(--ui-eff));
   background: var(--color-surface-strong);
   color: var(--color-text);
   border: var(--border);
@@ -145,8 +145,8 @@
   cursor: pointer;
 }
 .course-form-panel input[type="checkbox"] {
-  width: 24px;
-  height: 24px;
+  width: calc(24px * var(--ui-eff));
+  height: calc(24px * var(--ui-eff));
   accent-color: var(--color-primary);
   cursor: pointer;
 }
@@ -166,7 +166,7 @@
 }
 .course-progress progress {
   width: 100%;
-  height: 24px;
+  height: calc(24px * var(--ui-eff));
   border: 2px solid var(--color-border);
   border-radius: 999px;
   overflow: hidden;
@@ -271,8 +271,8 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 42px;
-  height: 42px;
+  width: calc(42px * var(--ui-eff));
+  height: calc(42px * var(--ui-eff));
   background: var(--color-danger);
   color: var(--color-on-danger);
   border: 2px solid var(--color-border);
@@ -336,9 +336,9 @@
   border-top: 3px dashed var(--color-surface-strong);
 }
 .video-instructor .tile-avatar {
-  width: 56px;
-  height: 56px;
-  font-size: 24px;
+  width: calc(56px * var(--ui-eff));
+  height: calc(56px * var(--ui-eff));
+  font-size: calc(24px * var(--text-eff));
   border-width: 3px;
 }
 .instructor-details {
@@ -346,7 +346,7 @@
   flex-direction: column;
 }
 .instructor-role {
-  font-size: 14px;
+  font-size: calc(14px * var(--text-eff));
   font-weight: 800;
   color: var(--color-primary);
   text-transform: uppercase;

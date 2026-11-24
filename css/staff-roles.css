@@ -94,7 +94,7 @@
 
 .course-create-summary small {
   display: block;
-  margin-top: 2px;
+  margin-top: calc(2px * var(--ui-eff));
   font-size: var(--font-size-sm);
   opacity: 0.75;
 }
@@ -127,11 +127,6 @@
 }
 
 /* ---------- Cursos: rascunho e ações de moderação ---------- */
-.chip-draft {
-  background: var(--color-surface-strong);
-  border-style: dashed;
-}
-
 .course-card.is-draft {
   border-style: dashed;
 }

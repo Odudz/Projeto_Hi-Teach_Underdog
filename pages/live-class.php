@@ -42,7 +42,7 @@ $myActive = $isTeacher ? liveTeacherActive($pdo, (int) $currentUser['id']) : nul
 $pageId = 'live-class';
 $pageTitle = 'Aulas ao vivo';
 $baseUrl = '../';
-$extraCss = ['forum', 'courses', 'live'];
+$extraCss = ['forum', 'courses', 'live', 'staff-roles'];
 include_once __DIR__ . '/../includes/cabecalho.php';
 ?>
 <main id="main-content" class="main-content courses-content">

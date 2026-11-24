@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Componentes de Interface para Painéis Administrativos
  */
@@ -111,20 +112,23 @@ function uiAttachment(string $src, string $name, string $mime): string
 function uiAuditLabel(string $action): string
 {
     return [
-        'ROLE_CHANGED'      => 'Cargo alterado',
-        'POST_DELETED'      => 'Mensagem excluída',
-        'TOPIC_DELETED'     => 'Fórum excluído',
-        'USER_MUTED'        => 'Usuário silenciado',
-        'USER_SUSPENDED'    => 'Usuário suspenso',
-        'SANCTION_REVOKED'  => 'Sanção revogada',
-        'REPORT_HANDLED'    => 'Denúncia atendida',
-        'LIVE_ENDED'        => 'Live encerrada',
-        'TEACHER_APPROVED'  => 'Professor aprovado',
-        'TEACHER_REJECTED'  => 'Professor recusado',
-        'SUBJECT_CREATED'   => 'Matéria criada',
-        'SUBJECT_UPDATED'   => 'Matéria atualizada',
-        'SUBJECT_DELETED'   => 'Matéria excluída',
-        'USER_ACTIVATED'    => 'Conta ativada',
-        'USER_DEACTIVATED'  => 'Conta desativada',
+        'ROLE_CHANGED'       => 'Cargo alterado',
+        'POST_DELETED'       => 'Mensagem excluída',
+        'TOPIC_DELETED'      => 'Fórum excluído',
+        'USER_MUTED'         => 'Usuário silenciado',
+        'USER_SUSPENDED'     => 'Usuário suspenso',
+        'SANCTION_REVOKED'   => 'Sanção revogada',
+        'REPORT_HANDLED'     => 'Denúncia atendida',
+        'LIVE_ENDED'         => 'Live encerrada',
+        'TEACHER_APPROVED'   => 'Professor aprovado',
+        'TEACHER_REJECTED'   => 'Professor recusado',
+        'SUBJECT_CREATED'    => 'Matéria criada',
+        'SUBJECT_UPDATED'    => 'Matéria atualizada',
+        'SUBJECT_DELETED'    => 'Matéria excluída',
+        'COURSE_DELETED'     => 'Curso excluído',
+        'COURSE_PUBLISHED'   => 'Curso publicado',
+        'COURSE_UNPUBLISHED' => 'Curso despublicado',
+        'USER_ACTIVATED'     => 'Conta ativada',
+        'USER_DEACTIVATED'   => 'Conta desativada',
     ][$action] ?? $action;
 }

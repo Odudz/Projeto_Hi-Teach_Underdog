@@ -6,7 +6,7 @@ require_once __DIR__ . '/../config/conexao.php';
 // ---------------------------------------------------------------
 function coursesEnsureSchema(PDO $pdo): void
 {
-    if (!empty($_SESSION['courses_schema_checked_v5'])) {
+    if (!empty($_SESSION['courses_schema_checked_v6'])) {
         return;
     }
     try {
@@ -143,7 +143,21 @@ function coursesEnsureSchema(PDO $pdo): void
             ) $tail"
         );
 
-        $_SESSION['courses_schema_checked_v5'] = true;
+        // Avaliações por estrelas (1 a 5), sem comentários.
+        // target_type: 'teacher' (professor), 'lesson' (aula) ou 'activity' (atividade).
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS course_ratings (
+                target_type ENUM('teacher','lesson','activity') NOT NULL,
+                target_id INT NOT NULL,
+                student_id INT NOT NULL,
+                stars TINYINT UNSIGNED NOT NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (target_type, target_id, student_id),
+                KEY idx_ratings_target (target_type, target_id)
+            ) $tail"
+        );
+
+        $_SESSION['courses_schema_checked_v6'] = true;
     } catch (Throwable $e) {
         error_log('courses.php: schema_failed: ' . $e->getMessage());
     }
